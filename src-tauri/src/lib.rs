@@ -2,6 +2,8 @@ mod commands;
 mod config;
 mod errors;
 mod extensions;
+mod responses;
+mod types;
 
 use crate::commands::*;
 use crate::config::Config;
@@ -15,7 +17,11 @@ fn generate_context() -> tauri::Context<Wry> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri_specta::Builder::<Wry>::new()
-        .commands(tauri_specta::collect_commands![greet, get_config])
+        .commands(tauri_specta::collect_commands![
+            greet,
+            get_config,
+            generate_qrcode,
+        ])
         .events(tauri_specta::collect_events![]);
 
     #[cfg(debug_assertions)]

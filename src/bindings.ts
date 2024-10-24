@@ -10,6 +10,14 @@ async greet(name: string) : Promise<string> {
 },
 async getConfig() : Promise<Config> {
     return await TAURI_INVOKE("get_config");
+},
+async generateQrcode() : Promise<Result<QrcodeData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("generate_qrcode") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -23,7 +31,9 @@ async getConfig() : Promise<Config> {
 
 /** user-defined types **/
 
+export type CommandError = string
 export type Config = { sessdata: string; downloadDir: string }
+export type QrcodeData = { base64: string; qrcodeKey: string }
 
 /** tauri-specta globals **/
 

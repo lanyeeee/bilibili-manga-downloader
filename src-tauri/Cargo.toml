@@ -27,7 +27,12 @@ specta = { version = "2.0.0-rc" }
 tauri-specta = { version = "2.0.0-rc", features = ["derive", "typescript"] }
 specta-typescript = { version = "0.0.7" }
 
+image = { version = "0.25.4", default-features = false, features = ["jpeg"] }
+base64 = { version = "0.22.1" }
+
 anyhow = { version = "1.0.91" }
+reqwest = { version = "0.12.8" }
+qrcode = { version = "0.14.1" }
 
 [profile.release]
 strip = true
