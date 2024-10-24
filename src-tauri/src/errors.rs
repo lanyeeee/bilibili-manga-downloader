@@ -15,8 +15,11 @@ impl Serialize for CommandError {
         serializer.serialize_str(&format!("{:#}", self.0))
     }
 }
-impl From<anyhow::Error> for CommandError {
-    fn from(err: anyhow::Error) -> Self {
-        Self(err.to_string_chain())
+impl<E> From<E> for CommandError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into().to_string_chain())
     }
 }
