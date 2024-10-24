@@ -51,12 +51,17 @@ pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
         return Err(anyhow!("生成二维码失败，data字段不存在: {bili_resp:?}").into());
     };
     // 尝试将data解析为GenerateQrcodeData
-    let generate_qrcode_data: GenerateQrcodeData = serde_json::from_value(data)?;
+    let data_str = data.to_string();
+    let generate_qrcode_data = serde_json::from_str::<GenerateQrcodeData>(&data_str).context(
+        format!("生成二维码失败，将data解析为GenerateQrcodeData失败: {data_str}"),
+    )?;
     // 生成二维码
-    let qr_code = QrCode::new(generate_qrcode_data.url)?;
+    let qr_code =
+        QrCode::new(generate_qrcode_data.url).context("生成二维码失败，从url创建QrCode失败")?;
     let img = qr_code.render::<Rgb<u8>>().build();
     let mut img_data: Vec<u8> = Vec::new();
-    img.write_to(&mut Cursor::new(&mut img_data), image::ImageFormat::Jpeg)?;
+    img.write_to(&mut Cursor::new(&mut img_data), image::ImageFormat::Jpeg)
+        .context("生成二维码失败，将QrCode写入img_data失败")?;
     let base64 = general_purpose::STANDARD.encode(img_data);
     let qrcode_data = QrcodeData {
         base64,
