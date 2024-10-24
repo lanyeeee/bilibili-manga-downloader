@@ -1,5 +1,6 @@
 mod commands;
 mod config;
+mod errors;
 mod extensions;
 
 use crate::commands::*;
