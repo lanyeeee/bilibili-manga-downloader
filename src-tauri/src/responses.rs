@@ -17,3 +17,14 @@ pub struct GenerateQrcodeData {
     #[serde(rename = "qrcode_key")]
     pub qrcode_key: String,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct QrcodeStatusData {
+    pub url: String,
+    #[serde(rename = "refresh_token")]
+    pub refresh_token: String,
+    pub timestamp: i64,
+    pub code: i64,
+    pub message: String,
+}
