@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::errors::CommandResult;
-use crate::responses::{BiliResp, GenerateQrcodeData};
+use crate::responses::{BiliResp, GenerateQrcodeData, QrcodeStatusData};
 use crate::types::QrcodeData;
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
@@ -64,4 +64,39 @@ pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
     };
 
     Ok(qrcode_data)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn get_qrcode_status_data(qrcode_key: &str) -> CommandResult<QrcodeStatusData> {
+    // 发送获取二维码状态请求
+    let http_res = reqwest::Client::new()
+        .get("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
+        .query(&[("qrcode_key", qrcode_key)])
+        .send()
+        .await?;
+    // 检查http响应状态码
+    let status = http_res.status();
+    let body = http_res.text().await?;
+    if status != StatusCode::OK {
+        return Err(anyhow!("获取二维码状态失败，预料之外的状态码({status}): {body}").into());
+    }
+    // 尝试将body解析为BiliResp
+    let bili_resp = serde_json::from_str::<BiliResp>(&body)
+        .context(format!("将body解析为BiliResp失败: {body}"))?;
+    // 检查BiliResp的code字段
+    if bili_resp.code != 0 {
+        return Err(anyhow!("获取二维码状态失败，预料之外的code: {bili_resp:?}").into());
+    }
+    // 检查BiliResp的data是否存在
+    let Some(data) = bili_resp.data else {
+        return Err(anyhow!("获取二维码状态失败，data字段不存在: {bili_resp:?}").into());
+    };
+    // 尝试将data解析为QrcodeStatusData
+    let data_str = data.to_string();
+    let qrcode_status_data = serde_json::from_str::<QrcodeStatusData>(&data_str).context(
+        format!("获取二维码状态失败，将data解析为QrcodeStatusData失败: {data_str}"),
+    )?;
+
+    Ok(qrcode_status_data)
 }

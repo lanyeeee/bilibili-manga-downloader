@@ -18,6 +18,14 @@ async generateQrcode() : Promise<Result<QrcodeData, CommandError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getQrcodeStatusData(qrcodeKey: string) : Promise<Result<QrcodeStatusData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_qrcode_status_data", { qrcodeKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -34,6 +42,7 @@ async generateQrcode() : Promise<Result<QrcodeData, CommandError>> {
 export type CommandError = string
 export type Config = { sessdata: string; downloadDir: string }
 export type QrcodeData = { base64: string; qrcodeKey: string }
+export type QrcodeStatusData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
 
 /** tauri-specta globals **/
 
