@@ -1,19 +1,22 @@
 use crate::config::Config;
+use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
     BiliResp, Buvid3RespData, GenerateQrcodeRespData, MangaRespData, QrcodeStatusRespData,
     SearchMangaRespData,
 };
-use crate::types::{Manga, QrcodeData};
+use crate::types::{EpisodeInfo, Manga, QrcodeData};
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
 use image::Rgb;
+use path_slash::PathBufExt;
 use qrcode::QrCode;
 use reqwest::StatusCode;
 use serde_json::{from_str, json};
 use std::io::Cursor;
+use std::path::PathBuf;
 use std::sync::RwLock;
 use tauri::{AppHandle, State};
 
@@ -195,6 +198,7 @@ pub async fn search_manga(
     if bili_resp.code != 0 {
         return Err(anyhow!("搜索漫画失败，预料之外的code: {bili_resp:?}").into());
     }
+    // 检查BiliResp的data是否存在
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("搜索漫画失败，data字段不存在: {bili_resp:?}").into());
     };
@@ -238,6 +242,7 @@ pub async fn get_manga(
     if bili_resp.code != 0 {
         return Err(anyhow!("获取漫画详情失败，预料之外的code: {bili_resp:?}").into());
     }
+    // 检查BiliResp的data是否存在
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("获取漫画详情失败，data字段不存在: {bili_resp:?}").into());
     };
@@ -249,4 +254,27 @@ pub async fn get_manga(
     let manga = Manga::from_manga_resp_data(&app, manga_resp_data);
 
     Ok(manga)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn download_episodes(
+    download_manager: State<'_, DownloadManager>,
+    episodes: Vec<EpisodeInfo>,
+) -> CommandResult<()> {
+    for ep in episodes {
+        download_manager.submit_episode(ep).await?;
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub fn show_path_in_file_manager(path: &str) -> CommandResult<()> {
+    let path = PathBuf::from_slash(path);
+    if !path.exists() {
+        return Err(anyhow!("路径`{path:?}`不存在").into());
+    }
+    showfile::show_path_in_file_manager(path);
+    Ok(())
 }

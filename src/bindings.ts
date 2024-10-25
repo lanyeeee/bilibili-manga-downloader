@@ -58,12 +58,53 @@ async getManga(id: number) : Promise<Result<Manga, CommandError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async downloadEpisodes(episodes: EpisodeInfo[]) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_episodes", { episodes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async showPathInFileManager(path: string) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("show_path_in_file_manager", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+downloadEpisodeEndEvent: DownloadEpisodeEndEvent,
+downloadEpisodePendingEvent: DownloadEpisodePendingEvent,
+downloadEpisodeStartEvent: DownloadEpisodeStartEvent,
+downloadImageErrorEvent: DownloadImageErrorEvent,
+downloadImageSuccessEvent: DownloadImageSuccessEvent,
+downloadSpeedEvent: DownloadSpeedEvent,
+removeWatermarkEndEvent: RemoveWatermarkEndEvent,
+removeWatermarkErrorEvent: RemoveWatermarkErrorEvent,
+removeWatermarkStartEvent: RemoveWatermarkStartEvent,
+removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent,
+updateOverallDownloadProgressEvent: UpdateOverallDownloadProgressEvent
+}>({
+downloadEpisodeEndEvent: "download-episode-end-event",
+downloadEpisodePendingEvent: "download-episode-pending-event",
+downloadEpisodeStartEvent: "download-episode-start-event",
+downloadImageErrorEvent: "download-image-error-event",
+downloadImageSuccessEvent: "download-image-success-event",
+downloadSpeedEvent: "download-speed-event",
+removeWatermarkEndEvent: "remove-watermark-end-event",
+removeWatermarkErrorEvent: "remove-watermark-error-event",
+removeWatermarkStartEvent: "remove-watermark-start-event",
+removeWatermarkSuccessEvent: "remove-watermark-success-event",
+updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
+})
 
 /** user-defined constants **/
 
@@ -79,6 +120,18 @@ export type Buvid3RespData = { buvid: string }
 export type CommandError = string
 export type Config = { sessdata: string; buvid3: string; downloadDir: string }
 export type DataInfo = { read_score: ReadScore; interactive_value: InteractiveValue }
+export type DownloadEpisodeEndEvent = DownloadEpisodeEndEventPayload
+export type DownloadEpisodeEndEventPayload = { epId: number; errMsg: string | null }
+export type DownloadEpisodePendingEvent = DownloadEpisodePendingEventPayload
+export type DownloadEpisodePendingEventPayload = { epId: number; title: string }
+export type DownloadEpisodeStartEvent = DownloadEpisodeStartEventPayload
+export type DownloadEpisodeStartEventPayload = { epId: number; title: string; total: number }
+export type DownloadImageErrorEvent = DownloadImageErrorEventPayload
+export type DownloadImageErrorEventPayload = { epId: number; url: string; errMsg: string }
+export type DownloadImageSuccessEvent = DownloadImageSuccessEventPayload
+export type DownloadImageSuccessEventPayload = { epId: number; url: string; current: number }
+export type DownloadSpeedEvent = DownloadSpeedEventPayload
+export type DownloadSpeedEventPayload = { speed: string }
 export type EpisodeInfo = { episodeId: number; episodeTitle: string; mangaId: number; mangaTitle: string; isLocked: boolean; isDownloaded: boolean }
 export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number; fav_coupon_type: number }
 export type Increase = { days: number; increase_percent: number }
@@ -89,11 +142,21 @@ export type QrcodeData = { base64: string; qrcodeKey: string }
 export type QrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
 export type ReadScore = { read_score: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type RecommendRespData = { id: number; title: string; horizontal_cover: string; square_cover: string; vertical_cover: string; last_short_title: string; recommendation: string; is_finish: number; total: number; allow_wait_free: boolean; author_name: string[]; styles: string[]; discount_type: number }
+export type RemoveWatermarkEndEvent = RemoveWatermarkEndEventPayload
+export type RemoveWatermarkEndEventPayload = { dirPath: string }
+export type RemoveWatermarkErrorEvent = RemoveWatermarkErrorEventPayload
+export type RemoveWatermarkErrorEventPayload = { dirPath: string; imgPath: string; errMsg: string }
+export type RemoveWatermarkStartEvent = RemoveWatermarkStartEventPayload
+export type RemoveWatermarkStartEventPayload = { dirPath: string; total: number }
+export type RemoveWatermarkSuccessEvent = RemoveWatermarkSuccessEventPayload
+export type RemoveWatermarkSuccessEventPayload = { dirPath: string; imgPath: string; current: number }
 export type RookieFavTip = { is_show: boolean; used: number; total: number }
 export type SearchMangaRespData = { list: MangaInSearchRespData[]; total_page: number; total_num: number; recommends: RecommendRespData[]; similar: string; se_id: string; banner: BannerRespData }
 export type StoryElem = { id: number; name: string }
 export type Styles2 = { id: number; name: string }
 export type Tag = { id: number; name: string }
+export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
+export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/
