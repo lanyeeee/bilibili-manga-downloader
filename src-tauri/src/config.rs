@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub sessdata: String,
+    pub buvid3: String,
     pub download_dir: PathBuf,
 }
 
@@ -17,6 +18,7 @@ impl Config {
         let config_path = app_data_dir.join("config.json");
         let default_config = Config {
             sessdata: String::new(),
+            buvid3: String::new(),
             download_dir: app_data_dir.join("漫画下载"),
         };
         // 如果配置文件存在且能够解析，则使用配置文件中的配置，否则使用默认配置
@@ -36,5 +38,11 @@ impl Config {
         let config_string = serde_json::to_string_pretty(self)?;
         std::fs::write(config_path, config_string)?;
         Ok(())
+    }
+}
+
+impl Config {
+    pub fn get_cookie(&self) -> String {
+        format!("buvid3={};SESSDATA={}", self.buvid3, self.sessdata)
     }
 }
