@@ -119,7 +119,7 @@ impl DownloadManager {
         for (i, url) in urls.iter().enumerate() {
             let manager = self.clone();
             let ep_id = ep_info.episode_id;
-            let save_path = temp_download_dir.join(format!("{i:03}.jpg"));
+            let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             let url = url.clone();
             let current = current.clone();
             // 创建下载任务
