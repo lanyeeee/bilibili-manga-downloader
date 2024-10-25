@@ -1,7 +1,10 @@
+use crate::config::Config;
+use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{EpisodeRespData, MangaRespData};
 use crate::utils::filename_filter;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
 #[derive(Default, Debug, Clone, PartialEq, Deserialize, Serialize, Type)]
@@ -356,9 +359,9 @@ impl Manga {
         comic_title: &str,
     ) -> anyhow::Result<bool> {
         let download_dir = app
-            .path()
-            .app_data_dir()?
-            .join("漫画下载")
+            .state::<RwLock<Config>>()
+            .read_or_panic()
+            .download_dir
             .join(comic_title)
             .join(ep_title);
         let is_downloaded = download_dir.exists();
