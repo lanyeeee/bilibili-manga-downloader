@@ -84,7 +84,7 @@ async function test() {
           SESSDATA:
         </template>
       </n-input>
-      <n-button @click="qrcodeViewerShowing=true">二维码登录</n-button>
+      <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
       <n-button @click="showConfigInFileManager">打开配置目录</n-button>
       <n-button @click="test">测试用</n-button>
       <div v-if="userProfile!==undefined" class="flex flex-justify-end">
