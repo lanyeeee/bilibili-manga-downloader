@@ -6,6 +6,8 @@ import QrcodeViewer from "./components/QrcodeViewer.vue";
 import DownloadingList from "./components/DownloadingList.vue";
 import SearchPane from "./components/SearchPane.vue";
 import EpisodePane from "./components/EpisodePane.vue";
+import {appDataDir} from "@tauri-apps/api/path";
+import {path} from "@tauri-apps/api";
 
 const notification = useNotification();
 const message = useMessage();
@@ -58,6 +60,15 @@ onMounted(async () => {
   }
 });
 
+async function showConfigInFileManager() {
+  const configName = "config.json";
+  const configPath = await path.join(await appDataDir(), configName);
+  const result = await commands.showPathInFileManager(configPath);
+  if (result.status === "error") {
+    notification.error({title: "打开配置文件失败", description: result.error});
+  }
+}
+
 async function test() {
   const result = await commands.getManga(26470);
   console.log(result);
@@ -74,7 +85,7 @@ async function test() {
         </template>
       </n-input>
       <n-button @click="qrcodeViewerShowing=true">二维码登录</n-button>
-      <!--   TODO: 检测SESSDATA是否有效的按钮   -->
+      <n-button @click="showConfigInFileManager">打开配置目录</n-button>
       <n-button @click="test">测试用</n-button>
       <div v-if="userProfile!==undefined" class="flex flex-justify-end">
         <n-avatar round
