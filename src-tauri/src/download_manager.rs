@@ -94,7 +94,7 @@ impl DownloadManager {
         let image_index_data = get_image_index_data(ep_info.episode_id, &cookie).await?;
         let image_token_data = get_image_token_data(&image_index_data, &cookie).await?;
 
-        let temp_download_dir = get_temp_download_dir(&self.app, &ep_info)?;
+        let temp_download_dir = get_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
             .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
         // 构造图片下载链接
@@ -210,14 +210,12 @@ impl DownloadManager {
     }
 }
 
-fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> anyhow::Result<PathBuf> {
-    let download_dir = app
-        .path()
-        .app_data_dir()?
-        .join("漫画下载")
+fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
+    app.state::<RwLock<Config>>()
+        .read_or_panic()
+        .download_dir
         .join(&ep_info.manga_title)
-        .join(format!(".下载中-{}", ep_info.episode_title)); // 以 `.下载中-` 开头，表示是临时目录
-    Ok(download_dir)
+        .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
 }
 
 async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
