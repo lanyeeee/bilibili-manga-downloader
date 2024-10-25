@@ -48,7 +48,7 @@ async getQrcodeStatusData(qrcodeKey: string) : Promise<Result<QrcodeStatusData, 
 /** user-defined types **/
 
 export type CommandError = string
-export type Config = { sessdata: string; downloadDir: string }
+export type Config = { sessdata: string; buvid3: string; downloadDir: string }
 export type QrcodeData = { base64: string; qrcodeKey: string }
 export type QrcodeStatusData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
 
