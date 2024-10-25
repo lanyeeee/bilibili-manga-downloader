@@ -29,7 +29,7 @@ onMounted(async () => {
 });
 
 async function test() {
-  const result = await commands.searchManga("一拳超人");
+  const result = await commands.getMangaDetailData(26470);
   console.log(result);
 }
 

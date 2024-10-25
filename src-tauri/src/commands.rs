@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, Buvid3Data, GenerateQrcodeData, QrcodeStatusData, SearchMangaData,
+    BiliResp, Buvid3Data, GenerateQrcodeData, MangaDetailData, QrcodeStatusData, SearchMangaData,
 };
 use crate::types::QrcodeData;
 use anyhow::{anyhow, Context};
@@ -203,4 +203,47 @@ pub async fn search_manga(
     ))?;
 
     Ok(search_manga_data)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn get_manga_detail_data(
+    app: AppHandle,
+    config: State<'_, RwLock<Config>>,
+    id: i64,
+) -> CommandResult<MangaDetailData> {
+    let cookie = config.read_or_panic().get_cookie();
+    let payload = json!({"comic_id": id});
+    // 发送获取漫画详情请求
+    let http_res = reqwest::Client::new()
+        .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail?device=pc&platform=web")
+        .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+        .header("cookie", &cookie)
+        .json(&payload)
+        .send()
+        .await?;
+    // 检查http响应状态码
+    let status = http_res.status();
+    let body = http_res.text().await?;
+    if status != StatusCode::OK {
+        return Err(anyhow!("获取漫画详情失败，预料之外的状态码({status}): {body}").into());
+    }
+    // 尝试将body解析为BiliResp
+    let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
+        "获取漫画详情失败，将body解析为BiliResp失败: {body}"
+    ))?;
+    // 检查BiliResp的code字段
+    if bili_resp.code != 0 {
+        return Err(anyhow!("获取漫画详情失败，预料之外的code: {bili_resp:?}").into());
+    }
+    let Some(data) = bili_resp.data else {
+        return Err(anyhow!("获取漫画详情失败，data字段不存在: {bili_resp:?}").into());
+    };
+    // 尝试将data解析为MangaDetailData
+    let data_str = data.to_string();
+    let manga_detail_data = serde_json::from_str::<MangaDetailData>(&data_str).context(format!(
+        "获取漫画详情失败，将data解析为MangaDetailData失败: {data_str}"
+    ))?;
+
+    Ok(manga_detail_data)
 }
