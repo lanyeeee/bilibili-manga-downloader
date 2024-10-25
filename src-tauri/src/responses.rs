@@ -5,7 +5,7 @@ use specta::Type;
 #[serde(rename_all = "camelCase")]
 pub struct BiliResp {
     pub code: i64,
-    #[serde(alias = "message")]
+    #[serde(default, alias = "message")]
     pub msg: String,
     pub data: Option<serde_json::Value>,
 }
