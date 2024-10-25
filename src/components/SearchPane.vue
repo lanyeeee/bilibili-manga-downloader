@@ -41,6 +41,7 @@ async function searchById(id: number) {
     return;
   }
 
+  selectedManga.value = result.data;
   currentTabName.value = "episode";
   searchMangaRespData.value = undefined;
 }
