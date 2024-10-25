@@ -42,6 +42,14 @@ async getBuvid3() : Promise<Result<Buvid3Data, CommandError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async searchManga(keyword: string) : Promise<Result<SearchMangaData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_manga", { keyword }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -55,11 +63,16 @@ async getBuvid3() : Promise<Result<Buvid3Data, CommandError>> {
 
 /** user-defined types **/
 
+export type Banner = { icon: string; title: string; url: string }
 export type Buvid3Data = { buvid: string }
 export type CommandError = string
 export type Config = { sessdata: string; buvid3: string; downloadDir: string }
 export type QrcodeData = { base64: string; qrcodeKey: string }
 export type QrcodeStatusData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
+export type Recommend = { id: number; title: string; horizontal_cover: string; square_cover: string; vertical_cover: string; last_short_title: string; recommendation: string; is_finish: number; total: number; allow_wait_free: boolean; author_name: string[]; styles: string[]; discount_type: number }
+export type SearchDetail = { id: number; title: string; org_title: string; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: Wiki; numbers: number; jump_value: string; real_title: string }
+export type SearchMangaData = { list: SearchDetail[]; total_page: number; total_num: number; recommends: Recommend[]; similar: string; se_id: string; banner: Banner }
+export type Wiki = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/
 

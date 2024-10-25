@@ -24,6 +24,7 @@ pub fn run() {
             generate_qrcode,
             get_qrcode_status_data,
             get_buvid3,
+            search_manga,
         ])
         .events(tauri_specta::collect_events![]);
 

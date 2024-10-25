@@ -1,7 +1,9 @@
 use crate::config::Config;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
-use crate::responses::{BiliResp, Buvid3Data, GenerateQrcodeData, QrcodeStatusData};
+use crate::responses::{
+    BiliResp, Buvid3Data, GenerateQrcodeData, QrcodeStatusData, SearchMangaData,
+};
 use crate::types::QrcodeData;
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
@@ -9,6 +11,7 @@ use base64::Engine;
 use image::Rgb;
 use qrcode::QrCode;
 use reqwest::StatusCode;
+use serde_json::json;
 use std::io::Cursor;
 use std::sync::RwLock;
 use tauri::{AppHandle, State};
@@ -155,4 +158,49 @@ pub async fn get_buvid3() -> CommandResult<Buvid3Data> {
     ))?;
 
     Ok(buvid3_data)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn search_manga(
+    config: State<'_, RwLock<Config>>,
+    keyword: &str,
+) -> CommandResult<SearchMangaData> {
+    let cookie = config.read_or_panic().get_cookie();
+    let payload = json!({
+        "key_word": keyword,
+        "page_num": 1,
+        "page_size": 99
+    });
+    // 发送搜索漫画请求
+    let http_resp = reqwest::Client::new()
+        .post("https://manga.bilibili.com/twirp/comic.v1.Comic/Search?device=pc&platform=web")
+        .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+        .header("cookie", &cookie)
+        .json(&payload)
+        .send()
+        .await?;
+    // 检查http响应状态码
+    let status = http_resp.status();
+    let body = http_resp.text().await?;
+    if status != StatusCode::OK {
+        return Err(anyhow!("搜索漫画失败，预料之外的状态码({status}): {body}").into());
+    }
+    // 尝试将body解析为BiliResp
+    let bili_resp = serde_json::from_str::<BiliResp>(&body)
+        .context(format!("将body解析为BiliResp失败: {body}"))?;
+    // 检查BiliResp的code字段
+    if bili_resp.code != 0 {
+        return Err(anyhow!("搜索漫画失败，预料之外的code: {bili_resp:?}").into());
+    }
+    let Some(data) = bili_resp.data else {
+        return Err(anyhow!("搜索漫画失败，data字段不存在: {bili_resp:?}").into());
+    };
+    // 尝试将data解析为SearchResultData
+    let data_str = data.to_string();
+    let search_manga_data = serde_json::from_str::<SearchMangaData>(&data_str).context(format!(
+        "搜索漫画失败，将data解析为SearchResultData失败: {data_str}"
+    ))?;
+
+    Ok(search_manga_data)
 }
