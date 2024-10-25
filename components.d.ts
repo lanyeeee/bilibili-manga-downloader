@@ -27,7 +27,6 @@ declare module 'vue' {
     NPagination: typeof import('naive-ui')['NPagination']
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']
-    NText: typeof import('naive-ui')['NText']
     QrcodeViewer: typeof import('./src/components/QrcodeViewer.vue')['default']
     SearchPane: typeof import('./src/components/SearchPane.vue')['default']
   }
