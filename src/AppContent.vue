@@ -29,7 +29,8 @@ onMounted(async () => {
 });
 
 async function test() {
-  console.log(config.value);
+  const result = await commands.getBuvid3();
+  console.log(result);
 }
 
 </script>
