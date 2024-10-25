@@ -3,12 +3,16 @@ import {commands, Config} from "./bindings.ts";
 import {ref, onMounted, watch} from "vue";
 import {useNotification, useMessage} from "naive-ui";
 import QrcodeViewer from "./components/QrcodeViewer.vue";
+import DownloadingList from "./components/DownloadingList.vue";
+import SearchPane from "./components/SearchPane.vue";
+import EpisodePane from "./components/EpisodePane.vue";
 
 const notification = useNotification();
 const message = useMessage();
 
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
+const currentTabName = ref<"search" | "episode">("search");
 
 watch(config, async () => {
   if (config.value === undefined) {
@@ -46,6 +50,21 @@ async function test() {
       <n-button @click="qrcodeViewerShowing=true">二维码登录</n-button>
       <!--   TODO: 检测SESSDATA是否有效的按钮   -->
       <n-button @click="test">测试用</n-button>
+    </div>
+    <div class="flex flex-1 overflow-hidden">
+      <div class="basis-1/2 overflow-auto">
+        <n-tabs v-model:value="currentTabName" type="line" size="small" class="h-full">
+          <n-tab-pane class="h-full overflow-auto p-0!" name="search" tab="漫画搜索" display-directive="show">
+            <search-pane v-model:current-tab-name="currentTabName"/>
+          </n-tab-pane>
+          <n-tab-pane class="h-full overflow-auto p-0!" name="episode" tab="章节详情" display-directive="show">
+            <episode-pane/>
+          </n-tab-pane>
+        </n-tabs>
+      </div>
+      <div class="basis-1/2 overflow-auto">
+        <downloading-list class="h-full"></downloading-list>
+      </div>
     </div>
   </div>
   <n-modal preset="dialog" title="请使用BiliBili手机客户端扫描二维码登录" v-model:show="qrcodeViewerShowing">

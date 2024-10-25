@@ -165,12 +165,13 @@ pub async fn get_buvid3() -> CommandResult<Buvid3Data> {
 pub async fn search_manga(
     config: State<'_, RwLock<Config>>,
     keyword: &str,
+    page_num: i64,
 ) -> CommandResult<SearchMangaData> {
     let cookie = config.read_or_panic().get_cookie();
     let payload = json!({
         "key_word": keyword,
-        "page_num": 1,
-        "page_size": 99
+        "page_num": page_num,
+        "page_size": 20,
     });
     // 发送搜索漫画请求
     let http_resp = reqwest::Client::new()

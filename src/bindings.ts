@@ -43,9 +43,9 @@ async getBuvid3() : Promise<Result<Buvid3Data, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async searchManga(keyword: string) : Promise<Result<SearchMangaData, CommandError>> {
+async searchManga(keyword: string, pageNum: number) : Promise<Result<SearchMangaData, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("search_manga", { keyword }) };
+    return { status: "ok", data: await TAURI_INVOKE("search_manga", { keyword, pageNum }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
