@@ -74,6 +74,14 @@ async showPathInFileManager(path: string) : Promise<Result<null, CommandError>> 
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getUserProfile() : Promise<Result<UserProfileRespData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_user_profile") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -115,6 +123,7 @@ updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
 export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
 export type AutoPayOrder = { id: number; title: string }
+export type AvatarIconRespData = { icon_resource: IconResourceRespData }
 export type BannerRespData = { icon: string; title: string; url: string }
 export type Buvid3RespData = { buvid: string }
 export type CommandError = string
@@ -134,10 +143,16 @@ export type DownloadSpeedEvent = DownloadSpeedEventPayload
 export type DownloadSpeedEventPayload = { speed: string }
 export type EpisodeInfo = { episodeId: number; episodeTitle: string; mangaId: number; mangaTitle: string; isLocked: boolean; isDownloaded: boolean }
 export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number; fav_coupon_type: number }
+export type IconResourceRespData = Record<string, never>
 export type Increase = { days: number; increase_percent: number }
 export type InteractiveValue = { interact_value: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
+export type LabelRespData = { path: string; text: string; label_theme: string; text_color: string; bg_style: number; bg_color: string; border_color: string; use_img_label: boolean; img_label_uri_hans: string; img_label_uri_hant: string; img_label_uri_hans_static: string; img_label_uri_hant_static: string }
+export type LevelInfoRespData = { current_level: number; current_min: number; current_exp: number; next_exp: string }
 export type Manga = { id: number; title: string; comic_type: number; page_default: number; page_allow: number; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; last_ord: number; is_finish: number; status: number; fav: number; read_order: number; evaluate: string; total: number; episodeInfos: EpisodeInfo[]; release_time: string; is_limit: number; read_epid: number; last_read_time: string; is_download: number; read_short_title: string; styles2: Styles2[]; renewal_time: string; last_short_title: string; discount_type: number; discount: number; discount_end: string; no_reward: boolean; batch_discount_type: number; ep_discount_type: number; has_fav_activity: boolean; fav_free_amount: number; allow_wait_free: boolean; wait_hour: number; wait_free_at: string; no_danmaku: number; auto_pay_status: number; no_month_ticket: boolean; immersive: boolean; no_discount: boolean; show_type: number; pay_mode: number; classic_lines: string; pay_for_new: number; fav_comic_info: FavComicInfo; serial_status: number; album_count: number; wiki_id: number; disable_coupon_amount: number; japan_comic: boolean; interact_value: string; temporary_finish_time: string; introduction: string; comment_status: number; no_screenshot: boolean; type: number; no_rank: boolean; presale_text: string; presale_discount: number; no_leaderboard: boolean; auto_pay_info: AutoPayInfo; orientation: number; story_elems: StoryElem[]; tags: Tag[]; is_star_hall: number; hall_icon_text: string; rookie_fav_tip: RookieFavTip; authors: Author[]; comic_alias: string[]; horizontal_covers: string[]; data_info: DataInfo; last_short_title_msg: string }
 export type MangaInSearchRespData = { id: number; title: string; org_title: string; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData; numbers: number; jump_value: string; real_title: string }
+export type OfficialRespData = { role: number; title: string; desc: string; type: number }
+export type OfficialVerifyRespData = { type: number; desc: string }
+export type PendantRespData = { pid: number; name: string; image: string; expire: number; image_enhance: string; image_enhance_frame: string; n_pid: number }
 export type QrcodeData = { base64: string; qrcodeKey: string }
 export type QrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
 export type ReadScore = { read_score: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
@@ -157,6 +172,10 @@ export type Styles2 = { id: number; name: string }
 export type Tag = { id: number; name: string }
 export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
 export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
+export type UserProfileRespData = { isLogin: boolean; email_verified: number; face: string; face_nft: number; face_nft_type: number; level_info: LevelInfoRespData; mid: number; mobile_verified: number; money: number; moral: number; official: OfficialRespData; officialVerify: OfficialVerifyRespData; pendant: PendantRespData; scores: number; uname: string; vipDueDate: number; vipStatus: number; vipType: number; vip_pay_type: number; vip_theme_type: number; vip_label: LabelRespData; vip_avatar_subscript: number; vip_nickname_color: string; vip: VipRespData; wallet: WalletRespData; has_shop: boolean; shop_url: string; answer_status: number; is_senior_member: number; wbi_img: WbiImgRespData; is_jury: boolean }
+export type VipRespData = { type: number; status: number; due_date: number; vip_pay_type: number; theme_type: number; label: LabelRespData; avatar_subscript: number; nickname_color: string; role: number; avatar_subscript_url: string; tv_vip_status: number; tv_vip_pay_type: number; tv_due_date: number; avatar_icon: AvatarIconRespData }
+export type WalletRespData = { mid: number; bcoin_balance: number; coupon_balance: number; coupon_due_time: number }
+export type WbiImgRespData = { img_url: string; sub_url: string }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/
