@@ -4,6 +4,7 @@ mod errors;
 mod extensions;
 mod responses;
 mod types;
+mod utils;
 
 use crate::commands::*;
 use crate::config::Config;

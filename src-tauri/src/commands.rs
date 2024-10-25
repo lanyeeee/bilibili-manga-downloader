@@ -5,7 +5,7 @@ use crate::responses::{
     BiliResp, Buvid3RespData, GenerateQrcodeRespData, MangaRespData, QrcodeStatusRespData,
     SearchMangaRespData,
 };
-use crate::types::QrcodeData;
+use crate::types::{Manga, QrcodeData};
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -209,7 +209,11 @@ pub async fn search_manga(
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn get_manga(config: State<'_, RwLock<Config>>, id: i64) -> CommandResult<MangaRespData> {
+pub async fn get_manga(
+    app: AppHandle,
+    config: State<'_, RwLock<Config>>,
+    id: i64,
+) -> CommandResult<Manga> {
     let cookie = config.read_or_panic().get_cookie();
     let payload = json!({"comic_id": id});
     // 发送获取漫画详情请求
@@ -242,6 +246,7 @@ pub async fn get_manga(config: State<'_, RwLock<Config>>, id: i64) -> CommandRes
     let manga_resp_data = from_str::<MangaRespData>(&data_str).context(format!(
         "获取漫画详情失败，将data解析为MangaRespData失败: {data_str}"
     ))?;
+    let manga = Manga::from_manga_resp_data(&app, manga_resp_data);
 
-    Ok(manga_resp_data)
+    Ok(manga)
 }
