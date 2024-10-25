@@ -28,3 +28,9 @@ pub struct QrcodeStatusData {
     pub code: i64,
     pub message: String,
 }
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Buvid3Data {
+    pub buvid: String,
+}

@@ -34,6 +34,14 @@ async getQrcodeStatusData(qrcodeKey: string) : Promise<Result<QrcodeStatusData, 
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getBuvid3() : Promise<Result<Buvid3Data, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_buvid3") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -47,6 +55,7 @@ async getQrcodeStatusData(qrcodeKey: string) : Promise<Result<QrcodeStatusData, 
 
 /** user-defined types **/
 
+export type Buvid3Data = { buvid: string }
 export type CommandError = string
 export type Config = { sessdata: string; buvid3: string; downloadDir: string }
 export type QrcodeData = { base64: string; qrcodeKey: string }
