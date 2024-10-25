@@ -111,7 +111,6 @@ async function selectDownloadDir() {
     <n-h3 class="m-be-0">下载列表</n-h3>
     <div class="flex gap-col-1">
       <n-input v-model:value="config.downloadDir"
-               :default-value="0"
                size="tiny"
                readonly
                placeholder="请选择漫画目录"
