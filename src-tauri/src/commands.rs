@@ -4,7 +4,7 @@ use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
     BiliResp, Buvid3RespData, GenerateQrcodeRespData, MangaRespData, QrcodeStatusRespData,
-    SearchMangaRespData,
+    SearchMangaRespData, UserProfileRespData,
 };
 use crate::types::{EpisodeInfo, Manga, QrcodeData};
 use anyhow::{anyhow, Context};
@@ -277,4 +277,43 @@ pub fn show_path_in_file_manager(path: &str) -> CommandResult<()> {
     }
     showfile::show_path_in_file_manager(path);
     Ok(())
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn get_user_profile(
+    config: State<'_, RwLock<Config>>,
+) -> CommandResult<UserProfileRespData> {
+    let cookie = config.read_or_panic().get_cookie();
+    // 发送获取用户信息请求
+    let http_resp = reqwest::Client::new()
+        .get("https://api.bilibili.com/x/web-interface/nav")
+        .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+        .header("cookie", &cookie)
+        .send()
+        .await?;
+    // 检查http响应状态码
+    let status = http_resp.status();
+    let body = http_resp.text().await?;
+    if status != StatusCode::OK {
+        return Err(anyhow!("获取用户信息失败，预料之外的状态码({status}): {body}").into());
+    }
+    // 尝试将body解析为BiliResp
+    let bili_resp =
+        from_str::<BiliResp>(&body).context(format!("将body解析为BiliResp失败: {body}"))?;
+    // 检查BiliResp的code字段
+    if bili_resp.code != 0 {
+        return Err(anyhow!("获取用户信息失败，预料之外的code: {bili_resp:?}").into());
+    }
+    // 检查BiliResp的data是否存在
+    let Some(data) = bili_resp.data else {
+        return Err(anyhow!("获取用户信息失败，data字段不存在: {bili_resp:?}").into());
+    };
+    // 尝试将data解析为UserProfileRespData
+    let data_str = data.to_string();
+    let user_profile_resp_data = from_str::<UserProfileRespData>(&data_str).context(format!(
+        "获取用户信息失败，将data解析为UserProfileRespData失败: {data_str}"
+    ))?;
+
+    Ok(user_profile_resp_data)
 }

@@ -33,6 +33,7 @@ pub fn run() {
             get_manga,
             download_episodes,
             show_path_in_file_manager,
+            get_user_profile,
         ])
         .events(tauri_specta::collect_events![
             RemoveWatermarkStartEvent,

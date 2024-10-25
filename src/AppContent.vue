@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {commands, Config, Manga} from "./bindings.ts";
+import {commands, Config, Manga, UserProfileRespData} from "./bindings.ts";
 import {ref, onMounted, watch} from "vue";
 import {useNotification, useMessage} from "naive-ui";
 import QrcodeViewer from "./components/QrcodeViewer.vue";
@@ -14,6 +14,7 @@ const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
 const selectedManga = ref<Manga>();
+const userProfile = ref<UserProfileRespData>();
 
 watch(config, async () => {
   if (config.value === undefined) {
@@ -27,6 +28,17 @@ watch(config, async () => {
 
   message.success("保存配置成功");
 }, {deep: true});
+
+watch(() => config.value?.sessdata, async () => {
+  const result = await commands.getUserProfile();
+  if (result.status === "error") {
+    notification.error({title: "获取用户信息失败", description: result.error});
+    userProfile.value = undefined;
+    return;
+  }
+  userProfile.value = result.data;
+  message.success("获取用户信息成功");
+});
 
 onMounted(async () => {
   // 屏蔽浏览器右键菜单
@@ -64,6 +76,13 @@ async function test() {
       <n-button @click="qrcodeViewerShowing=true">二维码登录</n-button>
       <!--   TODO: 检测SESSDATA是否有效的按钮   -->
       <n-button @click="test">测试用</n-button>
+      <div v-if="userProfile!==undefined" class="flex flex-justify-end">
+        <n-avatar round
+                  :img-props="{referrerpolicy: 'no-referrer'}"
+                  :size="32"
+                  :src="userProfile.face"/>
+        <span class="whitespace-nowrap">{{ userProfile.uname }}</span>
+      </div>
     </div>
     <div class="flex flex-1 overflow-hidden">
       <div class="basis-1/2 overflow-auto">
