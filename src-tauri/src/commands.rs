@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::errors::CommandResult;
+use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{BiliResp, GenerateQrcodeData, QrcodeStatusData};
 use crate::types::QrcodeData;
 use anyhow::{anyhow, Context};
@@ -9,6 +10,8 @@ use image::Rgb;
 use qrcode::QrCode;
 use reqwest::StatusCode;
 use std::io::Cursor;
+use std::sync::RwLock;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 #[specta::specta]
@@ -21,6 +24,20 @@ pub fn greet(name: &str) -> String {
 #[allow(clippy::needless_pass_by_value)]
 pub fn get_config(config: tauri::State<std::sync::RwLock<Config>>) -> Config {
     config.read().unwrap().clone()
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+#[allow(clippy::needless_pass_by_value)]
+pub fn save_config(
+    app: AppHandle,
+    config_state: State<RwLock<Config>>,
+    config: Config,
+) -> CommandResult<()> {
+    let mut config_state = config_state.write_or_panic();
+    *config_state = config;
+    config_state.save(&app)?;
+    Ok(())
 }
 
 #[tauri::command(async)]
