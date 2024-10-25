@@ -33,7 +33,7 @@ onMounted(async () => {
 });
 
 async function test() {
-  const result = await commands.getMangaDetailData(26470);
+  const result = await commands.getManga(26470);
   console.log(result);
 }
 

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {ref, computed} from "vue";
-import {commands, SearchMangaData} from "../bindings.ts";
+import {commands, SearchMangaRespData} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 import MangaCard from "./MangaCard.vue";
 
 const notification = useNotification();
 
-const searchMangaData = ref<SearchMangaData>();
+const searchMangaRespData = ref<SearchMangaRespData>();
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
 
 const searchInput = ref<string>("");
@@ -14,10 +14,10 @@ const mangaIdInput = ref<string>("");
 const searchPage = ref<number>(1);
 
 const searchPageCount = computed(() => {
-  if (searchMangaData.value === undefined) {
+  if (searchMangaRespData.value === undefined) {
     return 0;
   }
-  const total = searchMangaData.value.total_num;
+  const total = searchMangaRespData.value.total_num;
   return Math.floor(total / 20) + 1;
 });
 
@@ -29,19 +29,19 @@ async function searchByKeyword(keyword: string, pageNum: number) {
     return;
   }
 
-  searchMangaData.value = result.data;
-  console.log("searchData", searchMangaData.value);
+  searchMangaRespData.value = result.data;
+  console.log("searchData", searchMangaRespData.value);
 }
 
 async function searchById(id: number) {
-  let result = await commands.getMangaDetailData(id);
+  let result = await commands.getManga(id);
   if (result.status === "error") {
     notification.error({title: "获取漫画章节详情失败", description: result.error});
     return;
   }
 
   currentTabName.value = "episode";
-  searchMangaData.value = undefined;
+  searchMangaRespData.value = undefined;
 }
 
 </script>
@@ -75,9 +75,9 @@ async function searchById(id: number) {
       </n-input>
       <n-button size="tiny" @click="searchById(Number(mangaIdInput.trim()))">直达</n-button>
     </div>
-    <div v-if="searchMangaData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
+    <div v-if="searchMangaRespData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
       <div class="flex flex-col gap-row-2 overflow-auto">
-        <manga-card v-for="detail in searchMangaData.list"
+        <manga-card v-for="detail in searchMangaRespData.list"
                     :key="detail.id"
                     :manga-info="detail"
                     v-model:current-tab-name="currentTabName"/>

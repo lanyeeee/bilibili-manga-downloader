@@ -2,7 +2,8 @@ use crate::config::Config;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, Buvid3Data, GenerateQrcodeData, MangaDetailData, QrcodeStatusData, SearchMangaData,
+    BiliResp, Buvid3RespData, GenerateQrcodeRespData, MangaRespData, QrcodeStatusRespData,
+    SearchMangaRespData,
 };
 use crate::types::QrcodeData;
 use anyhow::{anyhow, Context};
@@ -11,7 +12,7 @@ use base64::Engine;
 use image::Rgb;
 use qrcode::QrCode;
 use reqwest::StatusCode;
-use serde_json::json;
+use serde_json::{from_str, json};
 use std::io::Cursor;
 use std::sync::RwLock;
 use tauri::{AppHandle, State};
@@ -25,7 +26,7 @@ pub fn greet(name: &str) -> String {
 #[tauri::command]
 #[specta::specta]
 #[allow(clippy::needless_pass_by_value)]
-pub fn get_config(config: tauri::State<std::sync::RwLock<Config>>) -> Config {
+pub fn get_config(config: State<RwLock<Config>>) -> Config {
     config.read().unwrap().clone()
 }
 
@@ -60,8 +61,8 @@ pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
         return Err(anyhow::anyhow!("生成二维码失败，预料之外的状态码({status}): {body}").into());
     }
     // 尝试将body解析为BiliResp
-    let bili_resp = serde_json::from_str::<BiliResp>(&body)
-        .context(format!("将body解析为BiliResp失败: {body}"))?;
+    let bili_resp =
+        from_str::<BiliResp>(&body).context(format!("将body解析为BiliResp失败: {body}"))?;
     // 检查BiliResp的code字段
     if bili_resp.code != 0 {
         return Err(anyhow!("生成二维码失败，预料之外的code: {bili_resp:?}").into());
@@ -70,14 +71,14 @@ pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("生成二维码失败，data字段不存在: {bili_resp:?}").into());
     };
-    // 尝试将data解析为GenerateQrcodeData
+    // 尝试将data解析为GenerateQrcodeRespData
     let data_str = data.to_string();
-    let generate_qrcode_data = serde_json::from_str::<GenerateQrcodeData>(&data_str).context(
-        format!("生成二维码失败，将data解析为GenerateQrcodeData失败: {data_str}"),
+    let generate_qrcode_resp_data = from_str::<GenerateQrcodeRespData>(&data_str).context(
+        format!("生成二维码失败，将data解析为GenerateQrcodeRespData失败: {data_str}"),
     )?;
     // 生成二维码
-    let qr_code =
-        QrCode::new(generate_qrcode_data.url).context("生成二维码失败，从url创建QrCode失败")?;
+    let qr_code = QrCode::new(generate_qrcode_resp_data.url)
+        .context("生成二维码失败，从url创建QrCode失败")?;
     let img = qr_code.render::<Rgb<u8>>().build();
     let mut img_data: Vec<u8> = Vec::new();
     img.write_to(&mut Cursor::new(&mut img_data), image::ImageFormat::Jpeg)
@@ -85,7 +86,7 @@ pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
     let base64 = general_purpose::STANDARD.encode(img_data);
     let qrcode_data = QrcodeData {
         base64,
-        qrcode_key: generate_qrcode_data.qrcode_key,
+        qrcode_key: generate_qrcode_resp_data.qrcode_key,
     };
 
     Ok(qrcode_data)
@@ -93,7 +94,7 @@ pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn get_qrcode_status_data(qrcode_key: &str) -> CommandResult<QrcodeStatusData> {
+pub async fn get_qrcode_status(qrcode_key: &str) -> CommandResult<QrcodeStatusRespData> {
     // 发送获取二维码状态请求
     let http_res = reqwest::Client::new()
         .get("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
@@ -107,8 +108,8 @@ pub async fn get_qrcode_status_data(qrcode_key: &str) -> CommandResult<QrcodeSta
         return Err(anyhow!("获取二维码状态失败，预料之外的状态码({status}): {body}").into());
     }
     // 尝试将body解析为BiliResp
-    let bili_resp = serde_json::from_str::<BiliResp>(&body)
-        .context(format!("将body解析为BiliResp失败: {body}"))?;
+    let bili_resp =
+        from_str::<BiliResp>(&body).context(format!("将body解析为BiliResp失败: {body}"))?;
     // 检查BiliResp的code字段
     if bili_resp.code != 0 {
         return Err(anyhow!("获取二维码状态失败，预料之外的code: {bili_resp:?}").into());
@@ -117,18 +118,18 @@ pub async fn get_qrcode_status_data(qrcode_key: &str) -> CommandResult<QrcodeSta
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("获取二维码状态失败，data字段不存在: {bili_resp:?}").into());
     };
-    // 尝试将data解析为QrcodeStatusData
+    // 尝试将data解析为QrcodeStatusRespData
     let data_str = data.to_string();
-    let qrcode_status_data = serde_json::from_str::<QrcodeStatusData>(&data_str).context(
-        format!("获取二维码状态失败，将data解析为QrcodeStatusData失败: {data_str}"),
-    )?;
+    let qrcode_status_resp_data = from_str::<QrcodeStatusRespData>(&data_str).context(format!(
+        "获取二维码状态失败，将data解析为QrcodeStatusRespData失败: {data_str}"
+    ))?;
 
-    Ok(qrcode_status_data)
+    Ok(qrcode_status_resp_data)
 }
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn get_buvid3() -> CommandResult<Buvid3Data> {
+pub async fn get_buvid3() -> CommandResult<Buvid3RespData> {
     // 发送获取buvid3请求
     let http_resp = reqwest::Client::new()
         .get("https://api.bilibili.com/x/web-frontend/getbuvid")
@@ -141,7 +142,7 @@ pub async fn get_buvid3() -> CommandResult<Buvid3Data> {
         return Err(anyhow!("获取buvid3失败，预料之外的状态码({status}): {body}").into());
     }
     // 尝试将body解析为BiliResp
-    let bili_resp = serde_json::from_str::<BiliResp>(&body)
+    let bili_resp = from_str::<BiliResp>(&body)
         .context(format!("获取buvid3失败，将body解析为BiliResp失败: {body}"))?;
     // 检查BiliResp的code字段
     if bili_resp.code != 0 {
@@ -151,13 +152,13 @@ pub async fn get_buvid3() -> CommandResult<Buvid3Data> {
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("获取buvid3失败，data字段不存在: {bili_resp:?}").into());
     };
-    // 尝试将data解析为String
+    // 尝试将data解析为Buvid3RespData
     let data_str = data.to_string();
-    let buvid3_data = serde_json::from_str::<Buvid3Data>(&data_str).context(format!(
-        "获取buvid3失败，将data解析为Buvid3Data失败: {data_str}"
+    let buvid3_resp_data = from_str::<Buvid3RespData>(&data_str).context(format!(
+        "获取buvid3失败，将data解析为Buvid3RespData失败: {data_str}"
     ))?;
 
-    Ok(buvid3_data)
+    Ok(buvid3_resp_data)
 }
 
 #[tauri::command(async)]
@@ -166,7 +167,7 @@ pub async fn search_manga(
     config: State<'_, RwLock<Config>>,
     keyword: &str,
     page_num: i64,
-) -> CommandResult<SearchMangaData> {
+) -> CommandResult<SearchMangaRespData> {
     let cookie = config.read_or_panic().get_cookie();
     let payload = json!({
         "key_word": keyword,
@@ -188,8 +189,8 @@ pub async fn search_manga(
         return Err(anyhow!("搜索漫画失败，预料之外的状态码({status}): {body}").into());
     }
     // 尝试将body解析为BiliResp
-    let bili_resp = serde_json::from_str::<BiliResp>(&body)
-        .context(format!("将body解析为BiliResp失败: {body}"))?;
+    let bili_resp =
+        from_str::<BiliResp>(&body).context(format!("将body解析为BiliResp失败: {body}"))?;
     // 检查BiliResp的code字段
     if bili_resp.code != 0 {
         return Err(anyhow!("搜索漫画失败，预料之外的code: {bili_resp:?}").into());
@@ -197,22 +198,18 @@ pub async fn search_manga(
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("搜索漫画失败，data字段不存在: {bili_resp:?}").into());
     };
-    // 尝试将data解析为SearchResultData
+    // 尝试将data解析为SearchMangaRespData
     let data_str = data.to_string();
-    let search_manga_data = serde_json::from_str::<SearchMangaData>(&data_str).context(format!(
-        "搜索漫画失败，将data解析为SearchResultData失败: {data_str}"
+    let search_manga_resp_data = from_str::<SearchMangaRespData>(&data_str).context(format!(
+        "搜索漫画失败，将data解析为SearchMangaRespData失败: {data_str}"
     ))?;
 
-    Ok(search_manga_data)
+    Ok(search_manga_resp_data)
 }
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn get_manga_detail_data(
-    app: AppHandle,
-    config: State<'_, RwLock<Config>>,
-    id: i64,
-) -> CommandResult<MangaDetailData> {
+pub async fn get_manga(config: State<'_, RwLock<Config>>, id: i64) -> CommandResult<MangaRespData> {
     let cookie = config.read_or_panic().get_cookie();
     let payload = json!({"comic_id": id});
     // 发送获取漫画详情请求
@@ -230,7 +227,7 @@ pub async fn get_manga_detail_data(
         return Err(anyhow!("获取漫画详情失败，预料之外的状态码({status}): {body}").into());
     }
     // 尝试将body解析为BiliResp
-    let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
+    let bili_resp = from_str::<BiliResp>(&body).context(format!(
         "获取漫画详情失败，将body解析为BiliResp失败: {body}"
     ))?;
     // 检查BiliResp的code字段
@@ -240,11 +237,11 @@ pub async fn get_manga_detail_data(
     let Some(data) = bili_resp.data else {
         return Err(anyhow!("获取漫画详情失败，data字段不存在: {bili_resp:?}").into());
     };
-    // 尝试将data解析为MangaDetailData
+    // 尝试将data解析为MangaRespData
     let data_str = data.to_string();
-    let manga_detail_data = serde_json::from_str::<MangaDetailData>(&data_str).context(format!(
-        "获取漫画详情失败，将data解析为MangaDetailData失败: {data_str}"
+    let manga_resp_data = from_str::<MangaRespData>(&data_str).context(format!(
+        "获取漫画详情失败，将data解析为MangaRespData失败: {data_str}"
     ))?;
 
-    Ok(manga_detail_data)
+    Ok(manga_resp_data)
 }

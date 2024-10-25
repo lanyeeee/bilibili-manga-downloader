@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import {commands, Config, QrcodeData, QrcodeStatusData} from "../bindings.ts";
+import {commands, Config, QrcodeData, QrcodeStatusRespData} from "../bindings.ts";
 import {ref, watch} from "vue";
 import {useMessage, useNotification} from "naive-ui";
 
@@ -12,7 +12,7 @@ const config = defineModel<Config>("config", {required: true});
 
 const qrcodeData = ref<QrcodeData>();
 const imgRef = ref<HTMLImageElement>();
-const qrcodeStatusData = ref<QrcodeStatusData>();
+const qrcodeStatus = ref<QrcodeStatusRespData>();
 
 
 watch(showing, async () => {
@@ -41,40 +41,40 @@ async function generateQrcode() {
       clearInterval(interval);
       return;
     }
-    await getQrcodeStatusData();
-    handleQrcodeStatusData();
+    await getQrcodeStatus();
+    handleQrcodeStatus();
   }, 1000);
 }
 
-async function getQrcodeStatusData() {
+async function getQrcodeStatus() {
   if (qrcodeData.value === undefined) {
     return;
   }
-  const result = await commands.getQrcodeStatusData(qrcodeData.value?.qrcodeKey);
+  const result = await commands.getQrcodeStatus(qrcodeData.value?.qrcodeKey);
   if (result.status === "error") {
     notification.error({title: "获取二维码状态失败", description: result.error});
     return;
   }
-  qrcodeStatusData.value = result.data;
-  console.log(qrcodeStatusData.value);
+  qrcodeStatus.value = result.data;
+  console.log(qrcodeStatus.value);
 }
 
-function handleQrcodeStatusData() {
-  if (qrcodeStatusData.value === undefined) {
+function handleQrcodeStatus() {
+  if (qrcodeStatus.value === undefined) {
     return;
   }
 
-  const code = qrcodeStatusData.value.code;
+  const code = qrcodeStatus.value.code;
   if (![0, 86101, 86090, 86038].includes(code)) {
     notification.error({
       title: "处理二维码状态失败，预料之外的code",
-      description: JSON.stringify(qrcodeStatusData.value),
+      description: JSON.stringify(qrcodeStatus.value),
     });
     return;
   }
 
   if (code === 0) {
-    config.value.sessdata = qrcodeStatusData.value.url.split("SESSDATA=")[1].split("&")[0];
+    config.value.sessdata = qrcodeStatus.value.url.split("SESSDATA=")[1].split("&")[0];
     showing.value = false;
     message.success("登录成功");
   }
@@ -85,7 +85,7 @@ function handleQrcodeStatusData() {
 
 <template>
   <div class="flex flex-col">
-    二维码状态：{{ qrcodeStatusData?.message }}
+    二维码状态：{{ qrcodeStatus?.message }}
     <img ref="imgRef" src="" alt="">
   </div>
 </template>
