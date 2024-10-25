@@ -59,7 +59,7 @@ async function searchById(id: number) {
                @keydown.enter="searchByKeyword(searchInput.trim(), 1)"
       >
         <template #prefix>
-          漫画名:
+          关键词:
         </template>
       </n-input>
       <n-button size="tiny" @click="searchByKeyword(searchInput.trim(), 1)">搜索</n-button>
