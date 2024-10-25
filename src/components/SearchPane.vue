@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref, computed} from "vue";
-import {commands, SearchMangaRespData} from "../bindings.ts";
+import {commands, Manga, SearchMangaRespData} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 import MangaCard from "./MangaCard.vue";
 
@@ -8,6 +8,7 @@ const notification = useNotification();
 
 const searchMangaRespData = ref<SearchMangaRespData>();
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
+const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
 
 const searchInput = ref<string>("");
 const mangaIdInput = ref<string>("");
@@ -77,10 +78,11 @@ async function searchById(id: number) {
     </div>
     <div v-if="searchMangaRespData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
       <div class="flex flex-col gap-row-2 overflow-auto">
-        <manga-card v-for="detail in searchMangaRespData.list"
-                    :key="detail.id"
-                    :manga-info="detail"
-                    v-model:current-tab-name="currentTabName"/>
+        <manga-card v-for="mangaInSearch in searchMangaRespData.list"
+                    :key="mangaInSearch.id"
+                    :manga-info="mangaInSearch"
+                    v-model:current-tab-name="currentTabName"
+                    v-model:selected-manga="selectedManga"/>
       </div>
       <n-pagination :page-count="searchPageCount"
                     :page="searchPage"

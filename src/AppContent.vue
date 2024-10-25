@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {commands, Config} from "./bindings.ts";
+import {commands, Config, Manga} from "./bindings.ts";
 import {ref, onMounted, watch} from "vue";
 import {useNotification, useMessage} from "naive-ui";
 import QrcodeViewer from "./components/QrcodeViewer.vue";
@@ -13,6 +13,7 @@ const message = useMessage();
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
+const selectedManga = ref<Manga>();
 
 watch(config, async () => {
   if (config.value === undefined) {
@@ -28,6 +29,10 @@ watch(config, async () => {
 }, {deep: true});
 
 onMounted(async () => {
+  // 屏蔽浏览器右键菜单
+  document.oncontextmenu = (event) => {
+    event.preventDefault();
+  };
   // 获取配置
   config.value = await commands.getConfig();
 });
@@ -55,10 +60,10 @@ async function test() {
       <div class="basis-1/2 overflow-auto">
         <n-tabs v-model:value="currentTabName" type="line" size="small" class="h-full">
           <n-tab-pane class="h-full overflow-auto p-0!" name="search" tab="漫画搜索" display-directive="show">
-            <search-pane v-model:current-tab-name="currentTabName"/>
+            <search-pane v-model:current-tab-name="currentTabName" v-model:selected-manga="selectedManga"/>
           </n-tab-pane>
           <n-tab-pane class="h-full overflow-auto p-0!" name="episode" tab="章节详情" display-directive="show">
-            <episode-pane/>
+            <episode-pane v-model:selected-manga="selectedManga"/>
           </n-tab-pane>
         </n-tabs>
       </div>

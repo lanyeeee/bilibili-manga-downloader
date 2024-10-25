@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {MangaInfo} from "../types.ts";
-import {commands} from "../bindings.ts";
+import {commands, Manga} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 
 const notification = useNotification();
@@ -10,6 +10,7 @@ defineProps<{
 }>();
 
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
+const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
 
 async function onClickItem(mangaId: number) {
   const result = await commands.getManga(mangaId);
@@ -17,7 +18,7 @@ async function onClickItem(mangaId: number) {
     notification.error({title: "获取漫画详情失败", description: result.error});
     return;
   }
-  // TODO: 设置selectedManga
+  selectedManga.value = result.data;
   currentTabName.value = "episode";
 }
 
