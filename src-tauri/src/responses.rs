@@ -12,7 +12,7 @@ pub struct BiliResp {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct GenerateQrcodeData {
+pub struct GenerateQrcodeRespData {
     pub url: String,
     #[serde(rename = "qrcode_key")]
     pub qrcode_key: String,
@@ -20,7 +20,7 @@ pub struct GenerateQrcodeData {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct QrcodeStatusData {
+pub struct QrcodeStatusRespData {
     pub url: String,
     #[serde(rename = "refresh_token")]
     pub refresh_token: String,
@@ -31,28 +31,28 @@ pub struct QrcodeStatusData {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Buvid3Data {
+pub struct Buvid3RespData {
     pub buvid: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct SearchMangaData {
-    pub list: Vec<SearchDetail>,
+pub struct SearchMangaRespData {
+    pub list: Vec<MangaInSearchRespData>,
     #[serde(rename = "total_page")]
     pub total_page: i32,
     #[serde(rename = "total_num")]
     pub total_num: i32,
-    pub recommends: Vec<Recommend>,
+    pub recommends: Vec<RecommendRespData>,
     pub similar: String,
     #[serde(rename = "se_id")]
     pub se_id: String,
-    pub banner: Banner,
+    pub banner: BannerRespData,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct SearchDetail {
+pub struct MangaInSearchRespData {
     pub id: i32,
     pub title: String,
     #[serde(rename = "org_title")]
@@ -74,7 +74,7 @@ pub struct SearchDetail {
     pub discount_type: i32,
     #[serde(rename = "type")]
     pub type_field: i32,
-    pub wiki: Wiki,
+    pub wiki: WikiRespData,
     pub numbers: i32,
     #[serde(rename = "jump_value")]
     pub jump_value: String,
@@ -84,7 +84,7 @@ pub struct SearchDetail {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Wiki {
+pub struct WikiRespData {
     pub id: i32,
     pub title: String,
     #[serde(rename = "origin_title")]
@@ -101,7 +101,7 @@ pub struct Wiki {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Recommend {
+pub struct RecommendRespData {
     pub id: i32,
     pub title: String,
     #[serde(rename = "horizontal_cover")]
@@ -127,7 +127,7 @@ pub struct Recommend {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Banner {
+pub struct BannerRespData {
     pub icon: String,
     pub title: String,
     pub url: String,
@@ -137,7 +137,7 @@ pub struct Banner {
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_excessive_bools)]
 #[allow(clippy::struct_field_names)]
-pub struct MangaDetailData {
+pub struct MangaRespData {
     pub id: i64,
     pub title: String,
     #[serde(rename = "comic_type")]
@@ -166,7 +166,7 @@ pub struct MangaDetailData {
     pub evaluate: String,
     pub total: i64,
     #[serde(rename = "ep_list")]
-    pub ep_list: Vec<EpList>,
+    pub ep_list: Vec<EpisodeRespData>,
     #[serde(rename = "release_time")]
     pub release_time: String,
     #[serde(rename = "is_limit")]
@@ -179,7 +179,7 @@ pub struct MangaDetailData {
     pub is_download: i64,
     #[serde(rename = "read_short_title")]
     pub read_short_title: String,
-    pub styles2: Vec<Styles2>,
+    pub styles2: Vec<Styles2RespData>,
     #[serde(rename = "renewal_time")]
     pub renewal_time: String,
     #[serde(rename = "last_short_title")]
@@ -223,7 +223,7 @@ pub struct MangaDetailData {
     #[serde(rename = "pay_for_new")]
     pub pay_for_new: i64,
     #[serde(rename = "fav_comic_info")]
-    pub fav_comic_info: FavComicInfo,
+    pub fav_comic_info: FavComicInfoRespData,
     #[serde(rename = "serial_status")]
     pub serial_status: i64,
     #[serde(rename = "album_count")]
@@ -254,31 +254,31 @@ pub struct MangaDetailData {
     #[serde(rename = "no_leaderboard")]
     pub no_leaderboard: bool,
     #[serde(rename = "auto_pay_info")]
-    pub auto_pay_info: AutoPayInfo,
+    pub auto_pay_info: AutoPayInfoRespData,
     pub orientation: i64,
     #[serde(rename = "story_elems")]
-    pub story_elems: Vec<StoryElem>,
-    pub tags: Vec<Tag>,
+    pub story_elems: Vec<StoryElemRespData>,
+    pub tags: Vec<TagRespData>,
     #[serde(rename = "is_star_hall")]
     pub is_star_hall: i64,
     #[serde(rename = "hall_icon_text")]
     pub hall_icon_text: String,
     #[serde(rename = "rookie_fav_tip")]
-    pub rookie_fav_tip: RookieFavTip,
-    pub authors: Vec<Author>,
+    pub rookie_fav_tip: RookieFavTipRespData,
+    pub authors: Vec<AuthorRespData>,
     #[serde(rename = "comic_alias")]
     pub comic_alias: Vec<String>,
     #[serde(rename = "horizontal_covers")]
     pub horizontal_covers: Vec<String>,
     #[serde(rename = "data_info")]
-    pub data_info: DataInfo,
+    pub data_info: DataInfoRespData,
     #[serde(rename = "last_short_title_msg")]
     pub last_short_title_msg: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct EpList {
+pub struct EpisodeRespData {
     pub id: i64,
     pub ord: f64,
     pub read: i64,
@@ -322,14 +322,14 @@ pub struct EpList {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Styles2 {
+pub struct Styles2RespData {
     pub id: i64,
     pub name: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct FavComicInfo {
+pub struct FavComicInfoRespData {
     #[serde(rename = "has_fav_activity")]
     pub has_fav_activity: bool,
     #[serde(rename = "fav_free_amount")]
@@ -340,36 +340,36 @@ pub struct FavComicInfo {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct AutoPayInfo {
+pub struct AutoPayInfoRespData {
     #[serde(rename = "auto_pay_orders")]
-    pub auto_pay_orders: Vec<AutoPayOrder>,
+    pub auto_pay_orders: Vec<AutoPayOrderRespData>,
     pub id: i64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct AutoPayOrder {
+pub struct AutoPayOrderRespData {
     pub id: i64,
     pub title: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct StoryElem {
+pub struct StoryElemRespData {
     pub id: i64,
     pub name: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Tag {
+pub struct TagRespData {
     pub id: i64,
     pub name: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct RookieFavTip {
+pub struct RookieFavTipRespData {
     #[serde(rename = "is_show")]
     pub is_show: bool,
     pub used: i64,
@@ -378,7 +378,7 @@ pub struct RookieFavTip {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Author {
+pub struct AuthorRespData {
     pub id: i64,
     pub name: String,
     pub cname: String,
@@ -386,41 +386,41 @@ pub struct Author {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct DataInfo {
+pub struct DataInfoRespData {
     #[serde(rename = "read_score")]
-    pub read_score: ReadScore,
+    pub read_score: ReadScoreRespData,
     #[serde(rename = "interactive_value")]
-    pub interactive_value: InteractiveValue,
+    pub interactive_value: InteractiveValueRespData,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_field_names)]
-pub struct ReadScore {
+pub struct ReadScoreRespData {
     #[serde(rename = "read_score")]
     pub read_score: String,
     #[serde(rename = "is_jump")]
     pub is_jump: bool,
-    pub increase: Increase,
+    pub increase: IncreaseRespData,
     pub percentile: f64,
     pub description: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct InteractiveValue {
+pub struct InteractiveValueRespData {
     #[serde(rename = "interact_value")]
     pub interact_value: String,
     #[serde(rename = "is_jump")]
     pub is_jump: bool,
-    pub increase: Increase,
+    pub increase: IncreaseRespData,
     pub percentile: f64,
     pub description: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct Increase {
+pub struct IncreaseRespData {
     pub days: i64,
     #[serde(rename = "increase_percent")]
     pub increase_percent: i64,

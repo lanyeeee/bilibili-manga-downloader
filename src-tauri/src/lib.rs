@@ -22,10 +22,10 @@ pub fn run() {
             get_config,
             save_config,
             generate_qrcode,
-            get_qrcode_status_data,
+            get_qrcode_status,
             get_buvid3,
             search_manga,
-            get_manga_detail_data,
+            get_manga,
         ])
         .events(tauri_specta::collect_events![]);
 

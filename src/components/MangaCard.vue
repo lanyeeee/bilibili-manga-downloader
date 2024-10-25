@@ -12,7 +12,7 @@ defineProps<{
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
 
 async function onClickItem(mangaId: number) {
-  const result = await commands.getMangaDetailData(mangaId);
+  const result = await commands.getManga(mangaId);
   if (result.status === "error") {
     notification.error({title: "获取漫画详情失败", description: result.error});
     return;
