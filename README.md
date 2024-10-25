@@ -8,7 +8,7 @@
 
 一个用于 manga.bilibili.com 哔哩哔哩漫画 B漫 的多线程下载器，带图形界面，下载速度飞快。图形界面基于[Tauri](https://v2.tauri.app/start/)
 
-在[Release页面](https://github.com/lanyeeee/bilibili-manga-downloader/releases)可以直接下载
+在[Release页面](https://github.com/lanyeeee/bilibili-manga-downloader/releases)可以直接下载，⭐ **如果觉得本项目对你有帮助，欢迎 Star 支持！** 🌟  
 
 # 图形界面
 
