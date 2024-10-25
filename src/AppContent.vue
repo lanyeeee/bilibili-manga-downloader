@@ -35,6 +35,15 @@ onMounted(async () => {
   };
   // 获取配置
   config.value = await commands.getConfig();
+  // 如果没有buvid3，获取一个
+  if (config.value.buvid3 === "") {
+    const result = await commands.getBuvid3();
+    if (result.status === "error") {
+      notification.error({title: "获取buvid3失败", description: result.error});
+      return;
+    }
+    config.value.buvid3 = result.data.buvid;
+  }
 });
 
 async function test() {
