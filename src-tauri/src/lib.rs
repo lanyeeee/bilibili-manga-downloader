@@ -1,6 +1,8 @@
 mod commands;
 mod config;
+mod download_manager;
 mod errors;
+mod events;
 mod extensions;
 mod responses;
 mod types;
@@ -8,6 +10,8 @@ mod utils;
 
 use crate::commands::*;
 use crate::config::Config;
+use crate::download_manager::DownloadManager;
+use crate::events::prelude::*;
 use anyhow::Context;
 use tauri::{Manager, Wry};
 
@@ -27,8 +31,22 @@ pub fn run() {
             get_buvid3,
             search_manga,
             get_manga,
+            download_episodes,
+            show_path_in_file_manager,
         ])
-        .events(tauri_specta::collect_events![]);
+        .events(tauri_specta::collect_events![
+            RemoveWatermarkStartEvent,
+            RemoveWatermarkSuccessEvent,
+            RemoveWatermarkErrorEvent,
+            RemoveWatermarkEndEvent,
+            DownloadEpisodePendingEvent,
+            DownloadEpisodeStartEvent,
+            DownloadImageSuccessEvent,
+            DownloadImageErrorEvent,
+            DownloadEpisodeEndEvent,
+            UpdateOverallDownloadProgressEvent,
+            DownloadSpeedEvent,
+        ]);
 
     #[cfg(debug_assertions)]
     builder
@@ -45,6 +63,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
+            builder.mount_events(app);
+
             let app_data_dir = app
                 .path()
                 .app_data_dir()
@@ -55,6 +75,9 @@ pub fn run() {
 
             let config = std::sync::RwLock::new(Config::new(app.handle())?);
             app.manage(config);
+
+            let download_manager = DownloadManager::new(app.handle().clone());
+            app.manage(download_manager);
             Ok(())
         })
         .run(generate_context())

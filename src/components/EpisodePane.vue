@@ -32,7 +32,7 @@ function extractIds(elements: Element[]): number[] {
       .filter(Boolean)
       .map(Number)
       .filter(id => {
-        const ep = selectedManga.value.episodeInfos.find(ep => ep.episodeId === id);
+        const ep = selectedManga.value?.episodeInfos.find(ep => ep.episodeId === id);
         if (ep === undefined) {
           return false;
         }
@@ -63,8 +63,8 @@ function onDropdownSelect(key: "check" | "uncheck" | "check all" | "uncheck all"
     checkedIds.value = checkedIds.value.filter(id => !selectedIds.value.has(id));
   } else if (key === "check all") {
     // 只有未锁定的才会被勾选
-    selectedManga.value.episodeInfos
-        ?.filter(ep => !ep.isLocked && !ep.isDownloaded && !checkedIds.value.includes(ep.episodeId))
+    selectedManga.value?.episodeInfos
+        .filter(ep => !ep.isLocked && !ep.isDownloaded && !checkedIds.value.includes(ep.episodeId))
         .forEach(ep => checkedIds.value.push(ep.episodeId));
   } else if (key === "uncheck all") {
     checkedIds.value.length = 0;
@@ -80,6 +80,23 @@ async function onContextMenu(e: MouseEvent) {
 }
 
 async function downloadEpisodes() {
+  const episodesToDownload = selectedManga.value?.episodeInfos.filter(ep => !ep.isDownloaded && checkedIds.value.includes(ep.episodeId));
+  if (episodesToDownload === undefined) {
+    return;
+  }
+  const result = await commands.downloadEpisodes(episodesToDownload);
+  if (result.status === "error") {
+    console.error(result.error);
+    return;
+  }
+
+  for (const downloadedEp of episodesToDownload) {
+    const episode = selectedManga.value?.episodeInfos.find(ep => ep.episodeId === downloadedEp.episodeId);
+    if (episode !== undefined) {
+      episode.isDownloaded = true;
+      checkedIds.value = checkedIds.value.filter(id => id !== downloadedEp.episodeId);
+    }
+  }
 }
 
 async function refreshEpisodes() {

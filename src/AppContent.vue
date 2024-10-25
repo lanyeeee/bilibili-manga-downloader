@@ -77,7 +77,7 @@ async function test() {
         </n-tabs>
       </div>
       <div class="basis-1/2 overflow-auto">
-        <downloading-list class="h-full"></downloading-list>
+        <downloading-list class="h-full" v-model:config="config"></downloading-list>
       </div>
     </div>
   </div>
