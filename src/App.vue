@@ -11,22 +11,9 @@ async function greet() {
 }
 
 async function test() {
-  const qrcodeDataResult = await commands.generateQrcode();
-  if (qrcodeDataResult.status === "error") {
-    console.log(qrcodeDataResult.error);
-    return;
-  }
-  const qrcodeData = qrcodeDataResult.data;
-  console.log(qrcodeData);
-  setInterval(async () => {
-    const qrcodeStatusDataResult = await commands.getQrcodeStatusData(qrcodeData.qrcodeKey);
-    if (qrcodeStatusDataResult.status === "error") {
-      console.log(qrcodeStatusDataResult.error);
-      return;
-    }
-    const qrcodeStatusData = qrcodeStatusDataResult.data;
-    console.log(qrcodeStatusData);
-  }, 1000);
+  const config = await commands.getConfig();
+  config.sessdata = "123";
+  await commands.saveConfig(config);
 }
 
 </script>
