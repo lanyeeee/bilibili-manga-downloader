@@ -157,7 +157,7 @@ pub struct MangaRespData {
     pub author_name: Vec<String>,
     pub styles: Vec<String>,
     #[serde(rename = "last_ord")]
-    pub last_ord: i64,
+    pub last_ord: f64,
     #[serde(rename = "is_finish")]
     pub is_finish: i64,
     pub status: i64,
