@@ -8,10 +8,11 @@ use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
 #[derive(Default, Debug, Clone, PartialEq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct QrcodeData {
     pub base64: String,
-    #[serde(rename = "qrcodeKey")]
-    pub qrcode_key: String,
+    #[serde(rename = "auth_code")]
+    pub auth_code: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

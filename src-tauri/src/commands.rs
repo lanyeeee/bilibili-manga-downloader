@@ -1,3 +1,4 @@
+use crate::bili_client::BiliClient;
 use crate::config::Config;
 use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
@@ -49,49 +50,8 @@ pub fn save_config(
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn generate_qrcode() -> CommandResult<QrcodeData> {
-    // 发送生成二维码请求
-    let http_resp = reqwest::Client::new()
-        .get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
-        .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
-        .header("origin", "https://manga.bilibili.com")
-        .send()
-        .await?;
-    // 检查http响应状态码
-    let status = http_resp.status();
-    let body = http_resp.text().await?;
-    if status != StatusCode::OK {
-        return Err(anyhow::anyhow!("生成二维码失败，预料之外的状态码({status}): {body}").into());
-    }
-    // 尝试将body解析为BiliResp
-    let bili_resp =
-        from_str::<BiliResp>(&body).context(format!("将body解析为BiliResp失败: {body}"))?;
-    // 检查BiliResp的code字段
-    if bili_resp.code != 0 {
-        return Err(anyhow!("生成二维码失败，预料之外的code: {bili_resp:?}").into());
-    }
-    // 检查BiliResp的data是否存在
-    let Some(data) = bili_resp.data else {
-        return Err(anyhow!("生成二维码失败，data字段不存在: {bili_resp:?}").into());
-    };
-    // 尝试将data解析为GenerateQrcodeRespData
-    let data_str = data.to_string();
-    let generate_qrcode_resp_data = from_str::<GenerateQrcodeRespData>(&data_str).context(
-        format!("生成二维码失败，将data解析为GenerateQrcodeRespData失败: {data_str}"),
-    )?;
-    // 生成二维码
-    let qr_code = QrCode::new(generate_qrcode_resp_data.url)
-        .context("生成二维码失败，从url创建QrCode失败")?;
-    let img = qr_code.render::<Rgb<u8>>().build();
-    let mut img_data: Vec<u8> = Vec::new();
-    img.write_to(&mut Cursor::new(&mut img_data), image::ImageFormat::Jpeg)
-        .context("生成二维码失败，将QrCode写入img_data失败")?;
-    let base64 = general_purpose::STANDARD.encode(img_data);
-    let qrcode_data = QrcodeData {
-        base64,
-        qrcode_key: generate_qrcode_resp_data.qrcode_key,
-    };
-
+pub async fn generate_qrcode(bili_client: State<'_, BiliClient>) -> CommandResult<QrcodeData> {
+    let qrcode_data = bili_client.generate_qrcode().await?;
     Ok(qrcode_data)
 }
 
@@ -126,6 +86,7 @@ pub async fn get_qrcode_status(qrcode_key: &str) -> CommandResult<QrcodeStatusRe
     let qrcode_status_resp_data = from_str::<QrcodeStatusRespData>(&data_str).context(format!(
         "获取二维码状态失败，将data解析为QrcodeStatusRespData失败: {data_str}"
     ))?;
+    println!("{:?}", qrcode_status_resp_data);
 
     Ok(qrcode_status_resp_data)
 }
