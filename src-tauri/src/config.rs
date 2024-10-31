@@ -9,6 +9,7 @@ use tauri::{AppHandle, Manager};
 pub struct Config {
     pub sessdata: String,
     pub buvid3: String,
+    pub access_token: String,
     pub download_dir: PathBuf,
 }
 
@@ -19,6 +20,7 @@ impl Config {
         let default_config = Config {
             sessdata: String::new(),
             buvid3: String::new(),
+            access_token: String::new(),
             download_dir: app_data_dir.join("漫画下载"),
         };
         // 如果配置文件存在且能够解析，则使用配置文件中的配置，否则使用默认配置

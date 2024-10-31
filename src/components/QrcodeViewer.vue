@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import {commands, Config, QrcodeData, QrcodeStatusRespData} from "../bindings.ts";
+import {commands, Config, QrcodeData, QrcodeStatus} from "../bindings.ts";
 import {ref, watch} from "vue";
 import {useMessage, useNotification} from "naive-ui";
 
@@ -12,7 +12,7 @@ const config = defineModel<Config>("config", {required: true});
 
 const qrcodeData = ref<QrcodeData>();
 const imgRef = ref<HTMLImageElement>();
-const qrcodeStatus = ref<QrcodeStatusRespData>();
+const qrcodeStatus = ref<QrcodeStatus>();
 
 
 watch(showing, async () => {
@@ -50,7 +50,7 @@ async function getQrcodeStatus() {
   if (qrcodeData.value === undefined) {
     return;
   }
-  const result = await commands.getQrcodeStatus(qrcodeData.value?.qrcodeKey);
+  const result = await commands.getQrcodeStatus(qrcodeData.value?.auth_code);
   if (result.status === "error") {
     notification.error({title: "获取二维码状态失败", description: result.error});
     return;
@@ -65,7 +65,7 @@ function handleQrcodeStatus() {
   }
 
   const code = qrcodeStatus.value.code;
-  if (![0, 86101, 86090, 86038].includes(code)) {
+  if (![0, 86038, 86039, 86090].includes(code)) {
     notification.error({
       title: "处理二维码状态失败，预料之外的code",
       description: JSON.stringify(qrcodeStatus.value),
@@ -74,7 +74,7 @@ function handleQrcodeStatus() {
   }
 
   if (code === 0) {
-    config.value.sessdata = qrcodeStatus.value.url.split("SESSDATA=")[1].split("&")[0];
+    config.value.accessToken = qrcodeStatus.value.access_token;
     showing.value = false;
     message.success("登录成功");
   }

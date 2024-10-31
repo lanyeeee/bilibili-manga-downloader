@@ -7,7 +7,7 @@ use crate::responses::{
     BiliResp, Buvid3RespData, GenerateQrcodeRespData, MangaRespData, QrcodeStatusRespData,
     SearchMangaRespData, UserProfileRespData,
 };
-use crate::types::{EpisodeInfo, Manga, QrcodeData};
+use crate::types::{EpisodeInfo, Manga, QrcodeData, QrcodeStatus};
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -57,38 +57,12 @@ pub async fn generate_qrcode(bili_client: State<'_, BiliClient>) -> CommandResul
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn get_qrcode_status(qrcode_key: &str) -> CommandResult<QrcodeStatusRespData> {
-    // 发送获取二维码状态请求
-    let http_res = reqwest::Client::new()
-        .get("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
-        .query(&[("qrcode_key", qrcode_key)])
-        .send()
-        .await?;
-    // 检查http响应状态码
-    let status = http_res.status();
-    let body = http_res.text().await?;
-    if status != StatusCode::OK {
-        return Err(anyhow!("获取二维码状态失败，预料之外的状态码({status}): {body}").into());
-    }
-    // 尝试将body解析为BiliResp
-    let bili_resp =
-        from_str::<BiliResp>(&body).context(format!("将body解析为BiliResp失败: {body}"))?;
-    // 检查BiliResp的code字段
-    if bili_resp.code != 0 {
-        return Err(anyhow!("获取二维码状态失败，预料之外的code: {bili_resp:?}").into());
-    }
-    // 检查BiliResp的data是否存在
-    let Some(data) = bili_resp.data else {
-        return Err(anyhow!("获取二维码状态失败，data字段不存在: {bili_resp:?}").into());
-    };
-    // 尝试将data解析为QrcodeStatusRespData
-    let data_str = data.to_string();
-    let qrcode_status_resp_data = from_str::<QrcodeStatusRespData>(&data_str).context(format!(
-        "获取二维码状态失败，将data解析为QrcodeStatusRespData失败: {data_str}"
-    ))?;
-    println!("{:?}", qrcode_status_resp_data);
-
-    Ok(qrcode_status_resp_data)
+pub async fn get_qrcode_status(
+    bili_client: State<'_, BiliClient>,
+    auth_code: String,
+) -> CommandResult<QrcodeStatus> {
+    let qrcode_status = bili_client.get_qrcode_status(auth_code).await?;
+    Ok(qrcode_status)
 }
 
 #[tauri::command(async)]
