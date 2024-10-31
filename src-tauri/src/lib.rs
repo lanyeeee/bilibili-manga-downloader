@@ -75,6 +75,7 @@ pub fn run() {
 
             std::fs::create_dir_all(&app_data_dir)
                 .context(format!("failed to create app data dir: {app_data_dir:?}"))?;
+            println!("app data dir: {app_data_dir:?}");
 
             let config = std::sync::RwLock::new(Config::new(app.handle())?);
             app.manage(config);

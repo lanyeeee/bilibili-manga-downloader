@@ -1,5 +1,6 @@
-use crate::responses::{BiliResp, GenerateQrcodeRespData};
-use crate::types::QrcodeData;
+use crate::errors::CommandResult;
+use crate::responses::{BiliResp, GenerateQrcodeRespData, QrcodeStatusRespData};
+use crate::types::{QrcodeData, QrcodeStatus};
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -63,7 +64,6 @@ impl BiliClient {
         let Some(data) = bili_resp.data else {
             return Err(anyhow!("生成二维码失败，data字段不存在: {bili_resp:?}"));
         };
-
         // 尝试将data解析为GenerateQrcodeRespData
         let data_str = data.to_string();
         let generate_qrcode_resp_data = serde_json::from_str::<GenerateQrcodeRespData>(&data_str)
@@ -84,6 +84,51 @@ impl BiliClient {
         };
 
         Ok(qrcode_data)
+    }
+
+    pub async fn get_qrcode_status(&self, auth_code: String) -> anyhow::Result<QrcodeStatus> {
+        let mut form = BTreeMap::new();
+        form.insert("auth_code".to_string(), auth_code);
+        form.insert("ts".to_string(), "0".to_string());
+        form.insert("local_id".to_string(), "0".to_string());
+        let signed_form = app_sign(form);
+        // 发送获取二维码状态请求
+        let http_res = Self::client()
+            .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/poll")
+            .form(&signed_form)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_res.status();
+        let body = http_res.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+                "获取二维码状态失败，预料之外的状态码({status}): {body}"
+            ));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body)
+            .context(format!("将body解析为BiliResp失败: {body}"))?;
+        // 检查BiliResp的code字段
+        if !matches!(bili_resp.code, 0 | 86038 | 86039 | 86090) {
+            return Err(anyhow!("获取二维码状态失败，预料之外的code: {bili_resp:?}"));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(ref data) = bili_resp.data else {
+            return Ok(QrcodeStatus::from(
+                bili_resp,
+                QrcodeStatusRespData::default(),
+            ));
+        };
+        // 尝试将data解析为QrcodeStatusRespData
+        let data_str = data.to_string();
+        let qrcode_status_resp_data = serde_json::from_str::<QrcodeStatusRespData>(&data_str)
+            .context(format!(
+                "获取二维码状态失败，将data解析为QrcodeStatusRespData失败: {data_str}"
+            ))?;
+        let qrcode_status = QrcodeStatus::from(bili_resp, qrcode_status_resp_data);
+
+        Ok(qrcode_status)
     }
 }
 
