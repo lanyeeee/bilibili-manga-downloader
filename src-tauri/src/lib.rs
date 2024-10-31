@@ -1,3 +1,4 @@
+mod bili_client;
 mod commands;
 mod config;
 mod download_manager;
@@ -80,6 +81,10 @@ pub fn run() {
 
             let download_manager = DownloadManager::new(app.handle().clone());
             app.manage(download_manager);
+
+            let bili_client = bili_client::BiliClient::new(app.handle().clone());
+            app.manage(bili_client);
+
             Ok(())
         })
         .run(generate_context())

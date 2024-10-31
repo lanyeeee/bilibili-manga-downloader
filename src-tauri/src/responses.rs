@@ -15,8 +15,8 @@ pub struct BiliResp {
 #[serde(rename_all = "camelCase")]
 pub struct GenerateQrcodeRespData {
     pub url: String,
-    #[serde(rename = "qrcode_key")]
-    pub qrcode_key: String,
+    #[serde(rename = "auth_code")]
+    pub auth_code: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -477,11 +477,15 @@ pub struct VideoRespData {
     pub svid: String,
 }
 
-pub type ImageTokenRespData = Vec<UrlTokenRespData>;
+pub type ImageTokenRespData = Vec<ImageTokenItemRespData>;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UrlTokenRespData {
+pub struct ImageTokenItemRespData {
+    #[serde(rename = "complete_url")]
+    pub complete_url: String,
+    #[serde(rename = "hit_encrpyt")]
+    pub hit_encrpyt: bool,
     pub url: String,
     pub token: String,
 }

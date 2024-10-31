@@ -100,9 +100,9 @@ impl DownloadManager {
         // 构造图片下载链接
         let urls: Vec<String> = image_token_data
             .into_iter()
-            .map(|data| (data.url, data.token))
-            .map(|(url, token)| format!("{url}?token={token}"))
+            .map(|data| data.complete_url)
             .collect();
+        println!("urls: {:?}", urls);
         let total = urls.len() as u32;
         // 记录总共需要下载的图片数量
         self.total_image_count.fetch_add(total, Ordering::Relaxed);
