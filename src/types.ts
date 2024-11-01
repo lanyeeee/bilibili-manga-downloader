@@ -1,4 +1,4 @@
-export type MangaInfo = {
+export type ComicInfo = {
     id: number;
     title: string;
     author_name: string[];
