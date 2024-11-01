@@ -1,3 +1,4 @@
+mod bili_client;
 mod commands;
 mod config;
 mod download_manager;
@@ -28,9 +29,8 @@ pub fn run() {
             save_config,
             generate_qrcode,
             get_qrcode_status,
-            get_buvid3,
-            search_manga,
-            get_manga,
+            search,
+            get_comic,
             download_episodes,
             show_path_in_file_manager,
             get_user_profile,
@@ -74,12 +74,17 @@ pub fn run() {
 
             std::fs::create_dir_all(&app_data_dir)
                 .context(format!("failed to create app data dir: {app_data_dir:?}"))?;
+            println!("app data dir: {app_data_dir:?}");
 
             let config = std::sync::RwLock::new(Config::new(app.handle())?);
             app.manage(config);
 
             let download_manager = DownloadManager::new(app.handle().clone());
             app.manage(download_manager);
+
+            let bili_client = bili_client::BiliClient::new(app.handle().clone());
+            app.manage(bili_client);
+
             Ok(())
         })
         .run(generate_context())
