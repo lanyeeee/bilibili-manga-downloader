@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {commands, Config, Manga, UserProfileRespData} from "./bindings.ts";
-import {ref, onMounted, watch} from "vue";
-import {useNotification, useMessage} from "naive-ui";
+import {Comic, commands, Config, UserProfileRespData} from "./bindings.ts";
+import {onMounted, ref, watch} from "vue";
+import {useMessage, useNotification} from "naive-ui";
 import QrcodeViewer from "./components/QrcodeViewer.vue";
 import DownloadingList from "./components/DownloadingList.vue";
 import SearchPane from "./components/SearchPane.vue";
@@ -15,7 +15,7 @@ const message = useMessage();
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
-const selectedManga = ref<Manga>();
+const selectedComic = ref<Comic>();
 const userProfile = ref<UserProfileRespData>();
 
 watch(config, async () => {
@@ -31,7 +31,10 @@ watch(config, async () => {
   message.success("保存配置成功");
 }, {deep: true});
 
-watch(() => config.value?.sessdata, async () => {
+watch(() => config.value?.accessToken, async () => {
+  if (config.value === undefined || config.value.accessToken === "") {
+    return;
+  }
   const result = await commands.getUserProfile();
   if (result.status === "error") {
     notification.error({title: "获取用户信息失败", description: result.error});
@@ -49,15 +52,6 @@ onMounted(async () => {
   };
   // 获取配置
   config.value = await commands.getConfig();
-  // 如果没有buvid3，获取一个
-  if (config.value.buvid3 === "") {
-    const result = await commands.getBuvid3();
-    if (result.status === "error") {
-      notification.error({title: "获取buvid3失败", description: result.error});
-      return;
-    }
-    config.value.buvid3 = result.data.buvid;
-  }
 });
 
 async function showConfigInFileManager() {
@@ -70,7 +64,7 @@ async function showConfigInFileManager() {
 }
 
 async function test() {
-  const result = await commands.getManga(26470);
+  const result = await commands.getComic(26731);
   console.log(result);
 }
 
@@ -78,35 +72,30 @@ async function test() {
 
 <template>
   <div v-if="config!==undefined" class="h-screen flex flex-col">
-    <div class="flex">
-      <n-input v-model:value="config.sessdata" placeholder="" clearable>
-        <template #prefix>
-          SESSDATA:
-        </template>
-      </n-input>
-      <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
-      <n-button @click="showConfigInFileManager">打开配置目录</n-button>
-      <n-button @click="test">测试用</n-button>
-      <div v-if="userProfile!==undefined" class="flex flex-justify-end">
-        <n-avatar round
-                  :img-props="{referrerpolicy: 'no-referrer'}"
-                  :size="32"
-                  :src="userProfile.face"/>
-        <span class="whitespace-nowrap">{{ userProfile.uname }}</span>
-      </div>
-    </div>
     <div class="flex flex-1 overflow-hidden">
       <div class="basis-1/2 overflow-auto">
         <n-tabs v-model:value="currentTabName" type="line" size="small" class="h-full">
           <n-tab-pane class="h-full overflow-auto p-0!" name="search" tab="漫画搜索" display-directive="show">
-            <search-pane v-model:current-tab-name="currentTabName" v-model:selected-manga="selectedManga"/>
+            <search-pane v-model:current-tab-name="currentTabName" v-model:selected-comic="selectedComic"/>
           </n-tab-pane>
           <n-tab-pane class="h-full overflow-auto p-0!" name="episode" tab="章节详情" display-directive="show">
-            <episode-pane v-model:selected-manga="selectedManga"/>
+            <episode-pane v-model:selected-comic="selectedComic"/>
           </n-tab-pane>
         </n-tabs>
       </div>
-      <div class="basis-1/2 overflow-auto">
+      <div class="basis-1/2 flex flex-col overflow-hidden">
+        <div class="flex">
+          <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
+          <n-button @click="showConfigInFileManager">打开配置目录</n-button>
+          <n-button @click="test">测试用</n-button>
+          <div v-if="userProfile!==undefined" class="flex flex-justify-end">
+            <n-avatar round
+                      :img-props="{referrerpolicy: 'no-referrer'}"
+                      :size="32"
+                      :src="userProfile.face"/>
+            <span class="whitespace-nowrap">{{ userProfile.name }}</span>
+          </div>
+        </div>
         <downloading-list class="h-full" v-model:config="config"></downloading-list>
       </div>
     </div>

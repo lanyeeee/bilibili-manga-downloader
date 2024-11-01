@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {SelectionArea, SelectionEvent, SelectionOptions} from "@viselect/vue";
 import {nextTick, ref, watch} from "vue";
-import {commands, Manga} from "../bindings.ts";
+import {commands, Comic} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 
 const notification = useNotification();
 
-const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
+const selectedComic = defineModel<Comic | undefined>("selectedComic", {required: true});
 
 const dropdownX = ref<number>(0);
 const dropdownY = ref<number>(0);
@@ -21,7 +21,7 @@ const checkedIds = ref<number[]>([]);
 const selectedIds = ref<Set<number>>(new Set());
 const selectionAreaRef = ref<InstanceType<typeof SelectionArea>>();
 
-watch(selectedManga, () => {
+watch(selectedComic, () => {
   checkedIds.value = [];
   selectedIds.value.clear();
   selectionAreaRef.value?.selection?.clearSelection();
@@ -32,7 +32,7 @@ function extractIds(elements: Element[]): number[] {
       .filter(Boolean)
       .map(Number)
       .filter(id => {
-        const ep = selectedManga.value?.episodeInfos.find(ep => ep.episodeId === id);
+        const ep = selectedComic.value?.episodeInfos.find(ep => ep.episodeId === id);
         if (ep === undefined) {
           return false;
         }
@@ -63,7 +63,7 @@ function onDropdownSelect(key: "check" | "uncheck" | "check all" | "uncheck all"
     checkedIds.value = checkedIds.value.filter(id => !selectedIds.value.has(id));
   } else if (key === "check all") {
     // 只有未锁定的才会被勾选
-    selectedManga.value?.episodeInfos
+    selectedComic.value?.episodeInfos
         .filter(ep => !ep.isLocked && !ep.isDownloaded && !checkedIds.value.includes(ep.episodeId))
         .forEach(ep => checkedIds.value.push(ep.episodeId));
   } else if (key === "uncheck all") {
@@ -80,7 +80,7 @@ async function onContextMenu(e: MouseEvent) {
 }
 
 async function downloadEpisodes() {
-  const episodesToDownload = selectedManga.value?.episodeInfos.filter(ep => !ep.isDownloaded && checkedIds.value.includes(ep.episodeId));
+  const episodesToDownload = selectedComic.value?.episodeInfos.filter(ep => !ep.isDownloaded && checkedIds.value.includes(ep.episodeId));
   if (episodesToDownload === undefined) {
     return;
   }
@@ -91,7 +91,7 @@ async function downloadEpisodes() {
   }
 
   for (const downloadedEp of episodesToDownload) {
-    const episode = selectedManga.value?.episodeInfos.find(ep => ep.episodeId === downloadedEp.episodeId);
+    const episode = selectedComic.value?.episodeInfos.find(ep => ep.episodeId === downloadedEp.episodeId);
     if (episode !== undefined) {
       episode.isDownloaded = true;
       checkedIds.value = checkedIds.value.filter(id => id !== downloadedEp.episodeId);
@@ -100,15 +100,15 @@ async function downloadEpisodes() {
 }
 
 async function refreshEpisodes() {
-  if (selectedManga.value === undefined) {
+  if (selectedComic.value === undefined) {
     return;
   }
-  const result = await commands.getManga(selectedManga.value.id);
+  const result = await commands.getComic(selectedComic.value.id);
   if (result.status === "error") {
     notification.error({title: "获取漫画章节详情失败", description: result.error});
     return;
   }
-  selectedManga.value = result.data;
+  selectedComic.value = result.data;
 }
 
 </script>
@@ -116,23 +116,23 @@ async function refreshEpisodes() {
 <template>
   <div class="h-full flex flex-col">
     <div class="flex flex-justify-around">
-      <span>总章数：{{ selectedManga?.episodeInfos.length }}</span>
+      <span>总章数：{{ selectedComic?.episodeInfos.length }}</span>
       <n-divider vertical></n-divider>
-      <span>已解锁：{{ selectedManga?.episodeInfos.filter(ep => !ep.isLocked).length }}</span>
+      <span>已解锁：{{ selectedComic?.episodeInfos.filter(ep => !ep.isLocked).length }}</span>
       <n-divider vertical></n-divider>
-      <span>已下载：{{ selectedManga?.episodeInfos.filter(ep => ep.isDownloaded).length }}</span>
+      <span>已下载：{{ selectedComic?.episodeInfos.filter(ep => ep.isDownloaded).length }}</span>
       <n-divider vertical></n-divider>
       <span>已勾选：{{ checkedIds.length }}</span>
     </div>
     <div class="flex justify-between">
       左键拖动进行框选，右键打开菜单
-      <n-button size="tiny" :disabled="selectedManga===undefined" @click="refreshEpisodes" class="w-1/6">刷新</n-button>
-      <n-button size="tiny" :disabled="selectedManga===undefined" type="primary" @click="downloadEpisodes"
+      <n-button size="tiny" :disabled="selectedComic===undefined" @click="refreshEpisodes" class="w-1/6">刷新</n-button>
+      <n-button size="tiny" :disabled="selectedComic===undefined" type="primary" @click="downloadEpisodes"
                 class="w-1/4">
         下载勾选章节
       </n-button>
     </div>
-    <n-empty v-if="selectedManga===undefined" description="请先进行漫画搜索">
+    <n-empty v-if="selectedComic===undefined" description="请先进行漫画搜索">
     </n-empty>
     <SelectionArea v-else
                    ref="selectionAreaRef"
@@ -142,7 +142,7 @@ async function refreshEpisodes() {
                    @move="onDragMove"
                    @start="onDragStart">
       <n-checkbox-group v-model:value="checkedIds" class="grid grid-cols-3 gap-1.5 w-full">
-        <n-checkbox v-for="{episodeId, episodeTitle, isLocked, isDownloaded} in selectedManga.episodeInfos"
+        <n-checkbox v-for="{episodeId, episodeTitle, isLocked, isDownloaded} in selectedComic.episodeInfos"
                     :key="episodeId"
                     :data-key="episodeId"
                     class="selectable hover:bg-gray-200!"
