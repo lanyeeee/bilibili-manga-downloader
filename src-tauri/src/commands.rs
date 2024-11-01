@@ -1,25 +1,17 @@
+use std::path::PathBuf;
+use std::sync::RwLock;
+
+use anyhow::anyhow;
+use path_slash::PathBufExt;
+use tauri::{AppHandle, State};
+
 use crate::bili_client::BiliClient;
 use crate::config::Config;
 use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
-use crate::responses::{
-    BiliResp, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData,
-    SearchRespData, UserProfileRespData,
-};
+use crate::responses::{SearchRespData, UserProfileRespData};
 use crate::types::{Comic, EpisodeInfo, QrcodeData, QrcodeStatus};
-use anyhow::{anyhow, Context};
-use base64::engine::general_purpose;
-use base64::Engine;
-use image::Rgb;
-use path_slash::PathBufExt;
-use qrcode::QrCode;
-use reqwest::StatusCode;
-use serde_json::{from_str, json};
-use std::io::Cursor;
-use std::path::PathBuf;
-use std::sync::RwLock;
-use tauri::{AppHandle, State};
 
 #[tauri::command]
 #[specta::specta]

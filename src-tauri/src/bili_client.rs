@@ -1,11 +1,8 @@
-use crate::config::Config;
-use crate::errors::CommandResult;
-use crate::extensions::IgnoreRwLockPoison;
-use crate::responses::{
-    BiliResp, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData, SearchRespData,
-    UserProfileRespData,
-};
-use crate::types::{Comic, QrcodeData, QrcodeStatus};
+use std::collections::BTreeMap;
+use std::io::Cursor;
+use std::sync::RwLock;
+use std::time::Duration;
+
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -13,12 +10,16 @@ use image::Rgb;
 use qrcode::QrCode;
 use reqwest::{Client, ClientBuilder, StatusCode};
 use serde_json::json;
-use std::collections::BTreeMap;
-use std::io::Cursor;
-use std::sync::RwLock;
-use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use url::form_urlencoded;
+
+use crate::config::Config;
+use crate::extensions::IgnoreRwLockPoison;
+use crate::responses::{
+    BiliResp, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData, SearchRespData,
+    UserProfileRespData,
+};
+use crate::types::{Comic, QrcodeData, QrcodeStatus};
 
 const APP_KEY: &str = "cc8617fd6961e070";
 const APP_SEC: &str = "3131924b941aac971e45189f265262be";
