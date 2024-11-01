@@ -12,8 +12,6 @@
 
 **如果本项目对你有帮助，欢迎点个 Star⭐ 支持！你的支持是我持续更新维护的动力🙏**
 
-${\color{red}提交ISSUE截图时，请务必将SESSDATA完全打码，一点也不要漏}$
-
 # 图形界面
 
 ![image](https://github.com/user-attachments/assets/09f12266-a3a7-4337-90b9-7be1ae649e88)
