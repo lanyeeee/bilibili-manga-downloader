@@ -30,7 +30,7 @@ pub fn run() {
             generate_qrcode,
             get_qrcode_status,
             get_buvid3,
-            search_manga,
+            search,
             get_manga,
             download_episodes,
             show_path_in_file_manager,

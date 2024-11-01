@@ -4,7 +4,7 @@ mod image_index_resp_data;
 mod image_token_resp_data;
 mod manga_resp_data;
 mod qrcode_status_resp_data;
-mod search_manga_resp_data;
+mod search_resp_data;
 mod user_profile_resp_data;
 
 pub use buvid3_resp_data::*;
@@ -13,7 +13,7 @@ pub use image_index_resp_data::*;
 pub use image_token_resp_data::*;
 pub use manga_resp_data::*;
 pub use qrcode_status_resp_data::*;
-pub use search_manga_resp_data::*;
+pub use search_resp_data::*;
 pub use user_profile_resp_data::*;
 
 use serde::{Deserialize, Serialize};
