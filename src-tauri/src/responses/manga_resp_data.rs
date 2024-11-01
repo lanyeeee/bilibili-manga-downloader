@@ -5,7 +5,7 @@ use specta::Type;
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_excessive_bools)]
 #[allow(clippy::struct_field_names)]
-pub struct MangaRespData {
+pub struct ComicRespData {
     pub id: i64,
     pub title: String,
     #[serde(rename = "comic_type")]

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref, computed} from "vue";
-import {commands, Manga, SearchRespData} from "../bindings.ts";
+import {commands, Comic, SearchRespData} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 import MangaCard from "./MangaCard.vue";
 
@@ -8,7 +8,7 @@ const notification = useNotification();
 
 const searchRespData = ref<SearchRespData>();
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
-const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
+const selectedManga = defineModel<Comic | undefined>("selectedManga", {required: true});
 
 const searchInput = ref<string>("");
 const mangaIdInput = ref<string>("");
@@ -34,8 +34,8 @@ async function searchByKeyword(keyword: string, pageNum: number) {
   console.log("searchData", searchRespData.value);
 }
 
-async function searchById(id: number) {
-  let result = await commands.getManga(id);
+async function searchById(comicId: number) {
+  let result = await commands.getComic(comicId);
   if (result.status === "error") {
     notification.error({title: "获取漫画章节详情失败", description: result.error});
     return;

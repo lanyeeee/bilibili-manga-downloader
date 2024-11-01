@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, CookieInfoRespData, EpisodeRespData, MangaRespData, QrcodeStatusRespData,
+    BiliResp, CookieInfoRespData, EpisodeRespData, ComicRespData, QrcodeStatusRespData,
     TokenInfoRespData,
 };
 use crate::utils::filename_filter;
@@ -22,7 +22,7 @@ pub struct QrcodeData {
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_excessive_bools)]
 #[allow(clippy::struct_field_names)]
-pub struct Manga {
+pub struct Comic {
     pub id: i64,
     pub title: String,
     #[serde(rename = "comic_type")]
@@ -159,8 +159,8 @@ pub struct Manga {
     #[serde(rename = "last_short_title_msg")]
     pub last_short_title_msg: String,
 }
-impl Manga {
-    pub fn from_manga_resp_data(app: &AppHandle, manga: MangaRespData) -> Self {
+impl Comic {
+    pub fn from_comic_resp_data(app: &AppHandle, manga: ComicRespData) -> Self {
         let manga_title = filename_filter(&manga.title);
         let mut episode_infos: Vec<EpisodeInfo> = manga
             .ep_list
