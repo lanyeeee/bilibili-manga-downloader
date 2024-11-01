@@ -72,23 +72,6 @@ async function test() {
 
 <template>
   <div v-if="config!==undefined" class="h-screen flex flex-col">
-    <div class="flex">
-      <n-input v-model:value="config.accessToken" placeholder="" clearable>
-        <template #prefix>
-          access_token:
-        </template>
-      </n-input>
-      <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
-      <n-button @click="showConfigInFileManager">打开配置目录</n-button>
-      <n-button @click="test">测试用</n-button>
-      <div v-if="userProfile!==undefined" class="flex flex-justify-end">
-        <n-avatar round
-                  :img-props="{referrerpolicy: 'no-referrer'}"
-                  :size="32"
-                  :src="userProfile.face"/>
-        <span class="whitespace-nowrap">{{ userProfile.name }}</span>
-      </div>
-    </div>
     <div class="flex flex-1 overflow-hidden">
       <div class="basis-1/2 overflow-auto">
         <n-tabs v-model:value="currentTabName" type="line" size="small" class="h-full">
@@ -100,7 +83,19 @@ async function test() {
           </n-tab-pane>
         </n-tabs>
       </div>
-      <div class="basis-1/2 overflow-auto">
+      <div class="basis-1/2 flex flex-col overflow-hidden">
+        <div class="flex">
+          <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
+          <n-button @click="showConfigInFileManager">打开配置目录</n-button>
+          <n-button @click="test">测试用</n-button>
+          <div v-if="userProfile!==undefined" class="flex flex-justify-end">
+            <n-avatar round
+                      :img-props="{referrerpolicy: 'no-referrer'}"
+                      :size="32"
+                      :src="userProfile.face"/>
+            <span class="whitespace-nowrap">{{ userProfile.name }}</span>
+          </div>
+        </div>
         <downloading-list class="h-full" v-model:config="config"></downloading-list>
       </div>
     </div>

@@ -108,7 +108,6 @@ async function selectDownloadDir() {
 
 <template>
   <div class="flex flex-col gap-row-1">
-    <n-h3 class="m-be-0">下载列表</n-h3>
     <div class="flex gap-col-1">
       <n-input v-model:value="config.downloadDir"
                size="tiny"
@@ -126,12 +125,14 @@ async function selectDownloadDir() {
       </n-progress>
       <span>{{ overallProgress.current }}/{{ overallProgress.total }}</span>
     </div>
-    <div class="grid grid-cols-[2fr_4fr_1fr]"
-         v-for="[epId, {title, percentage, indicator}] in progresses"
-         :key="epId">
-      <span class="mb-1! text-ellipsis whitespace-nowrap overflow-hidden">{{ title }}</span>
-      <n-progress class="" :percentage="percentage"/>
-      <span>{{ indicator }}</span>
+    <div class="flex-1 overflow-auto">
+      <div class="grid grid-cols-[2fr_4fr_1fr]"
+           v-for="[epId, {title, percentage, indicator}] in progresses"
+           :key="epId">
+        <span class="mb-1! text-ellipsis whitespace-nowrap overflow-hidden">{{ title }}</span>
+        <n-progress class="" :percentage="percentage"/>
+        <span>{{ indicator }}</span>
+      </div>
     </div>
   </div>
 </template>
