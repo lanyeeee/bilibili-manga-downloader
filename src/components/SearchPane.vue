@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {ref, computed} from "vue";
-import {commands, Manga, SearchMangaRespData} from "../bindings.ts";
+import {commands, Manga, SearchRespData} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 import MangaCard from "./MangaCard.vue";
 
 const notification = useNotification();
 
-const searchMangaRespData = ref<SearchMangaRespData>();
+const searchRespData = ref<SearchRespData>();
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
 const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
 
@@ -15,23 +15,23 @@ const mangaIdInput = ref<string>("");
 const searchPage = ref<number>(1);
 
 const searchPageCount = computed(() => {
-  if (searchMangaRespData.value === undefined) {
+  if (searchRespData.value === undefined) {
     return 0;
   }
-  const total = searchMangaRespData.value.total_num;
+  const total = searchRespData.value.comic_data.total_num;
   return Math.floor(total / 20) + 1;
 });
 
 async function searchByKeyword(keyword: string, pageNum: number) {
   searchPage.value = pageNum;
-  let result = await commands.searchManga(keyword, pageNum);
+  let result = await commands.search(keyword, pageNum);
   if (result.status === "error") {
     notification.error({title: "搜索失败", description: result.error});
     return;
   }
 
-  searchMangaRespData.value = result.data;
-  console.log("searchData", searchMangaRespData.value);
+  searchRespData.value = result.data;
+  console.log("searchData", searchRespData.value);
 }
 
 async function searchById(id: number) {
@@ -43,7 +43,7 @@ async function searchById(id: number) {
 
   selectedManga.value = result.data;
   currentTabName.value = "episode";
-  searchMangaRespData.value = undefined;
+  searchRespData.value = undefined;
 }
 
 </script>
@@ -77,9 +77,9 @@ async function searchById(id: number) {
       </n-input>
       <n-button size="tiny" @click="searchById(Number(mangaIdInput.trim()))">直达</n-button>
     </div>
-    <div v-if="searchMangaRespData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
+    <div v-if="searchRespData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
       <div class="flex flex-col gap-row-2 overflow-auto">
-        <manga-card v-for="mangaInSearch in searchMangaRespData.list"
+        <manga-card v-for="mangaInSearch in searchRespData.comic_data.list"
                     :key="mangaInSearch.id"
                     :manga-info="mangaInSearch"
                     v-model:current-tab-name="currentTabName"

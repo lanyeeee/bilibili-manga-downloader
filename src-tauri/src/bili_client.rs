@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, GenerateQrcodeRespData, QrcodeStatusRespData, UserProfileRespData,
+    BiliResp, GenerateQrcodeRespData, QrcodeStatusRespData, SearchRespData, UserProfileRespData,
 };
 use crate::types::{QrcodeData, QrcodeStatus};
 use anyhow::{anyhow, Context};
@@ -11,6 +11,7 @@ use base64::Engine;
 use image::Rgb;
 use qrcode::QrCode;
 use reqwest::{Client, ClientBuilder, StatusCode};
+use serde_json::json;
 use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::sync::RwLock;
@@ -175,6 +176,48 @@ impl BiliClient {
             ))?;
 
         Ok(user_profile_resp_data)
+    }
+
+    pub async fn search(
+        &self,
+        keyword: &str,
+        page_num: i64,
+    ) -> anyhow::Result<SearchRespData> {
+        let payload = json!({
+            "keyword": keyword,
+            "pageNum": page_num,
+            "pageSize": 20,
+        });
+        // 发送搜索漫画请求
+        let http_resp = Self::client()
+            .post("https://manga.bilibili.com/twirp/search.v1.Search/SearchKeyword")
+            .json(&payload)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!("搜索漫画失败，预料之外的状态码({status}): {body}"));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body)
+            .context(format!("将body解析为BiliResp失败: {body}"))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!("搜索漫画失败，预料之外的code: {bili_resp:?}"));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!("搜索漫画失败，data字段不存在: {bili_resp:?}"));
+        };
+        // 尝试将data解析为SearchRespData
+        let data_str = data.to_string();
+        let search_manga_resp_data = serde_json::from_str::<SearchRespData>(&data_str).context(
+            format!("搜索漫画失败，将data解析为SearchRespData失败: {data_str}"),
+        )?;
+
+        Ok(search_manga_resp_data)
     }
 
     fn access_token(&self) -> String {
