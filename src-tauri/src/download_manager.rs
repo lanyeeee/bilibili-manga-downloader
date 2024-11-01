@@ -320,7 +320,7 @@ fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
     app.state::<RwLock<Config>>()
         .read_or_panic()
         .download_dir
-        .join(&ep_info.manga_title)
+        .join(&ep_info.comic_title)
         .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
 }
 

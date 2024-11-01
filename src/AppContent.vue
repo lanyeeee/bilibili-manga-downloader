@@ -15,7 +15,7 @@ const message = useMessage();
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
-const selectedManga = ref<Comic>();
+const selectedComic = ref<Comic>();
 const userProfile = ref<UserProfileRespData>();
 
 watch(config, async () => {
@@ -93,10 +93,10 @@ async function test() {
       <div class="basis-1/2 overflow-auto">
         <n-tabs v-model:value="currentTabName" type="line" size="small" class="h-full">
           <n-tab-pane class="h-full overflow-auto p-0!" name="search" tab="漫画搜索" display-directive="show">
-            <search-pane v-model:current-tab-name="currentTabName" v-model:selected-manga="selectedManga"/>
+            <search-pane v-model:current-tab-name="currentTabName" v-model:selected-comic="selectedComic"/>
           </n-tab-pane>
           <n-tab-pane class="h-full overflow-auto p-0!" name="episode" tab="章节详情" display-directive="show">
-            <episode-pane v-model:selected-manga="selectedManga"/>
+            <episode-pane v-model:selected-comic="selectedComic"/>
           </n-tab-pane>
         </n-tabs>
       </div>
