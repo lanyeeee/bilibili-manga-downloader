@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {commands, Config, Comic, UserProfileRespData} from "./bindings.ts";
-import {ref, onMounted, watch} from "vue";
-import {useNotification, useMessage} from "naive-ui";
+import {Comic, commands, Config, UserProfileRespData} from "./bindings.ts";
+import {onMounted, ref, watch} from "vue";
+import {useMessage, useNotification} from "naive-ui";
 import QrcodeViewer from "./components/QrcodeViewer.vue";
 import DownloadingList from "./components/DownloadingList.vue";
 import SearchPane from "./components/SearchPane.vue";
@@ -31,7 +31,10 @@ watch(config, async () => {
   message.success("保存配置成功");
 }, {deep: true});
 
-watch(() => config.value?.sessdata, async () => {
+watch(() => config.value?.accessToken, async () => {
+  if (config.value === undefined || config.value.accessToken === "") {
+    return;
+  }
   const result = await commands.getUserProfile();
   if (result.status === "error") {
     notification.error({title: "获取用户信息失败", description: result.error});
@@ -49,15 +52,6 @@ onMounted(async () => {
   };
   // 获取配置
   config.value = await commands.getConfig();
-  // 如果没有buvid3，获取一个
-  if (config.value.buvid3 === "") {
-    const result = await commands.getBuvid3();
-    if (result.status === "error") {
-      notification.error({title: "获取buvid3失败", description: result.error});
-      return;
-    }
-    config.value.buvid3 = result.data.buvid;
-  }
 });
 
 async function showConfigInFileManager() {
@@ -79,9 +73,9 @@ async function test() {
 <template>
   <div v-if="config!==undefined" class="h-screen flex flex-col">
     <div class="flex">
-      <n-input v-model:value="config.sessdata" placeholder="" clearable>
+      <n-input v-model:value="config.accessToken" placeholder="" clearable>
         <template #prefix>
-          SESSDATA:
+          access_token:
         </template>
       </n-input>
       <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
