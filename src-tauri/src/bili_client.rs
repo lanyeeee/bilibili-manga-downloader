@@ -223,16 +223,16 @@ impl BiliClient {
 
     pub async fn get_comic(&self, comic_id: i64) -> anyhow::Result<Comic> {
         let access_token = self.access_token();
-        let payload = json!({"comic_id": comic_id});
         let params = json!({
             "device": "android",
             "access_key": access_token,
         });
+        let payload = json!({"comic_id": comic_id});
         // 发送获取漫画详情请求
         let http_res = Self::client()
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail")
-            .json(&payload)
             .query(&params)
+            .json(&payload)
             .send()
             .await?;
         // 检查http响应状态码
