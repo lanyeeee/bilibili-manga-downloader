@@ -42,7 +42,7 @@ impl BiliClient {
         // 发送生成二维码请求
         let http_resp = Self::client()
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/auth_code")
-            .form(&signed_form)
+            .query(&signed_form)
             .send()
             .await?;
         // 检查http响应状态码
@@ -95,7 +95,7 @@ impl BiliClient {
         // 发送获取二维码状态请求
         let http_res = Self::client()
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/poll")
-            .form(&signed_form)
+            .query(&signed_form)
             .send()
             .await?;
         // 检查http响应状态码
