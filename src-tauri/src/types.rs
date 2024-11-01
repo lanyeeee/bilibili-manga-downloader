@@ -1,24 +1,30 @@
-use crate::config::Config;
-use crate::extensions::IgnoreRwLockPoison;
-use crate::responses::{EpisodeRespData, MangaRespData};
-use crate::utils::filename_filter;
+use std::sync::RwLock;
+
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use std::sync::RwLock;
 use tauri::{AppHandle, Manager};
 
+use crate::config::Config;
+use crate::extensions::IgnoreRwLockPoison;
+use crate::responses::{
+    BiliResp, ComicRespData, CookieInfoRespData, EpisodeRespData, QrcodeStatusRespData,
+    TokenInfoRespData,
+};
+use crate::utils::filename_filter;
+
 #[derive(Default, Debug, Clone, PartialEq, Deserialize, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct QrcodeData {
     pub base64: String,
-    #[serde(rename = "qrcodeKey")]
-    pub qrcode_key: String,
+    #[serde(rename = "auth_code")]
+    pub auth_code: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 #[allow(clippy::struct_excessive_bools)]
 #[allow(clippy::struct_field_names)]
-pub struct Manga {
+pub struct Comic {
     pub id: i64,
     pub title: String,
     #[serde(rename = "comic_type")]
@@ -155,23 +161,23 @@ pub struct Manga {
     #[serde(rename = "last_short_title_msg")]
     pub last_short_title_msg: String,
 }
-impl Manga {
-    pub fn from_manga_resp_data(app: &AppHandle, manga: MangaRespData) -> Self {
-        let manga_title = filename_filter(&manga.title);
-        let mut episode_infos: Vec<EpisodeInfo> = manga
+impl Comic {
+    pub fn from_comic_resp_data(app: &AppHandle, comic: ComicRespData) -> Self {
+        let comic_title = filename_filter(&comic.title);
+        let mut episode_infos: Vec<EpisodeInfo> = comic
             .ep_list
             .into_iter()
             .filter_map(|ep| {
                 let episode_id = ep.id;
                 let episode_title = Self::get_episode_title(&ep);
-                let manga_title = manga_title.clone();
+                let comic_title = comic_title.clone();
                 let is_downloaded =
-                    Self::get_is_downloaded(app, &episode_title, &manga_title).ok()?;
+                    Self::get_is_downloaded(app, &episode_title, &comic_title).ok()?;
                 let episode_info = EpisodeInfo {
                     episode_id,
                     episode_title,
-                    manga_id: manga.id,
-                    manga_title,
+                    comic_id: comic.id,
+                    comic_title,
                     is_locked: ep.is_locked,
                     is_downloaded,
                 };
@@ -180,7 +186,7 @@ impl Manga {
             .collect();
         episode_infos.reverse();
 
-        let styles2 = manga
+        let styles2 = comic
             .styles2
             .into_iter()
             .map(|s| Styles2 {
@@ -190,13 +196,13 @@ impl Manga {
             .collect();
 
         let fav_comic_info = FavComicInfo {
-            has_fav_activity: manga.fav_comic_info.has_fav_activity,
-            fav_free_amount: manga.fav_comic_info.fav_free_amount,
-            fav_coupon_type: manga.fav_comic_info.fav_coupon_type,
+            has_fav_activity: comic.fav_comic_info.has_fav_activity,
+            fav_free_amount: comic.fav_comic_info.fav_free_amount,
+            fav_coupon_type: comic.fav_comic_info.fav_coupon_type,
         };
 
         let auto_pay_info = AutoPayInfo {
-            auto_pay_orders: manga
+            auto_pay_orders: comic
                 .auto_pay_info
                 .auto_pay_orders
                 .into_iter()
@@ -205,10 +211,10 @@ impl Manga {
                     title: order.title,
                 })
                 .collect(),
-            id: manga.auto_pay_info.id,
+            id: comic.auto_pay_info.id,
         };
 
-        let story_elems = manga
+        let story_elems = comic
             .story_elems
             .into_iter()
             .map(|elem| StoryElem {
@@ -217,7 +223,7 @@ impl Manga {
             })
             .collect();
 
-        let tags = manga
+        let tags = comic
             .tags
             .into_iter()
             .map(|tag| Tag {
@@ -227,12 +233,12 @@ impl Manga {
             .collect();
 
         let rookie_fav_tip = RookieFavTip {
-            is_show: manga.rookie_fav_tip.is_show,
-            used: manga.rookie_fav_tip.used,
-            total: manga.rookie_fav_tip.total,
+            is_show: comic.rookie_fav_tip.is_show,
+            used: comic.rookie_fav_tip.used,
+            total: comic.rookie_fav_tip.total,
         };
 
-        let authors = manga
+        let authors = comic
             .authors
             .into_iter()
             .map(|author| Author {
@@ -244,103 +250,103 @@ impl Manga {
 
         let data_info = DataInfo {
             read_score: ReadScore {
-                read_score: manga.data_info.read_score.read_score,
-                is_jump: manga.data_info.read_score.is_jump,
+                read_score: comic.data_info.read_score.read_score,
+                is_jump: comic.data_info.read_score.is_jump,
                 increase: Increase {
-                    days: manga.data_info.read_score.increase.days,
-                    increase_percent: manga.data_info.read_score.increase.increase_percent,
+                    days: comic.data_info.read_score.increase.days,
+                    increase_percent: comic.data_info.read_score.increase.increase_percent,
                 },
-                percentile: manga.data_info.read_score.percentile,
-                description: manga.data_info.read_score.description,
+                percentile: comic.data_info.read_score.percentile,
+                description: comic.data_info.read_score.description,
             },
             interactive_value: InteractiveValue {
-                interact_value: manga.data_info.interactive_value.interact_value,
-                is_jump: manga.data_info.interactive_value.is_jump,
+                interact_value: comic.data_info.interactive_value.interact_value,
+                is_jump: comic.data_info.interactive_value.is_jump,
                 increase: Increase {
-                    days: manga.data_info.interactive_value.increase.days,
-                    increase_percent: manga.data_info.interactive_value.increase.increase_percent,
+                    days: comic.data_info.interactive_value.increase.days,
+                    increase_percent: comic.data_info.interactive_value.increase.increase_percent,
                 },
-                percentile: manga.data_info.interactive_value.percentile,
-                description: manga.data_info.interactive_value.description,
+                percentile: comic.data_info.interactive_value.percentile,
+                description: comic.data_info.interactive_value.description,
             },
         };
 
         Self {
-            id: manga.id,
-            title: manga.title,
-            comic_type: manga.comic_type,
-            page_default: manga.page_default,
-            page_allow: manga.page_allow,
-            horizontal_cover: manga.horizontal_cover,
-            square_cover: manga.square_cover,
-            vertical_cover: manga.vertical_cover,
-            author_name: manga.author_name,
-            styles: manga.styles,
-            last_ord: manga.last_ord,
-            is_finish: manga.is_finish,
-            status: manga.status,
-            fav: manga.fav,
-            read_order: manga.read_order,
-            evaluate: manga.evaluate,
-            total: manga.total,
+            id: comic.id,
+            title: comic.title,
+            comic_type: comic.comic_type,
+            page_default: comic.page_default,
+            page_allow: comic.page_allow,
+            horizontal_cover: comic.horizontal_cover,
+            square_cover: comic.square_cover,
+            vertical_cover: comic.vertical_cover,
+            author_name: comic.author_name,
+            styles: comic.styles,
+            last_ord: comic.last_ord,
+            is_finish: comic.is_finish,
+            status: comic.status,
+            fav: comic.fav,
+            read_order: comic.read_order,
+            evaluate: comic.evaluate,
+            total: comic.total,
             episode_infos,
-            release_time: manga.release_time,
-            is_limit: manga.is_limit,
-            read_epid: manga.read_epid,
-            last_read_time: manga.last_read_time,
-            is_download: manga.is_download,
-            read_short_title: manga.read_short_title,
+            release_time: comic.release_time,
+            is_limit: comic.is_limit,
+            read_epid: comic.read_epid,
+            last_read_time: comic.last_read_time,
+            is_download: comic.is_download,
+            read_short_title: comic.read_short_title,
             styles2,
-            renewal_time: manga.renewal_time,
-            last_short_title: manga.last_short_title,
-            discount_type: manga.discount_type,
-            discount: manga.discount,
-            discount_end: manga.discount_end,
-            no_reward: manga.no_reward,
-            batch_discount_type: manga.batch_discount_type,
-            ep_discount_type: manga.ep_discount_type,
-            has_fav_activity: manga.has_fav_activity,
-            fav_free_amount: manga.fav_free_amount,
-            allow_wait_free: manga.allow_wait_free,
-            wait_hour: manga.wait_hour,
-            wait_free_at: manga.wait_free_at,
-            no_danmaku: manga.no_danmaku,
-            auto_pay_status: manga.auto_pay_status,
-            no_month_ticket: manga.no_month_ticket,
-            immersive: manga.immersive,
-            no_discount: manga.no_discount,
-            show_type: manga.show_type,
-            pay_mode: manga.pay_mode,
-            classic_lines: manga.classic_lines,
-            pay_for_new: manga.pay_for_new,
+            renewal_time: comic.renewal_time,
+            last_short_title: comic.last_short_title,
+            discount_type: comic.discount_type,
+            discount: comic.discount,
+            discount_end: comic.discount_end,
+            no_reward: comic.no_reward,
+            batch_discount_type: comic.batch_discount_type,
+            ep_discount_type: comic.ep_discount_type,
+            has_fav_activity: comic.has_fav_activity,
+            fav_free_amount: comic.fav_free_amount,
+            allow_wait_free: comic.allow_wait_free,
+            wait_hour: comic.wait_hour,
+            wait_free_at: comic.wait_free_at,
+            no_danmaku: comic.no_danmaku,
+            auto_pay_status: comic.auto_pay_status,
+            no_month_ticket: comic.no_month_ticket,
+            immersive: comic.immersive,
+            no_discount: comic.no_discount,
+            show_type: comic.show_type,
+            pay_mode: comic.pay_mode,
+            classic_lines: comic.classic_lines,
+            pay_for_new: comic.pay_for_new,
             fav_comic_info,
-            serial_status: manga.serial_status,
-            album_count: manga.album_count,
-            wiki_id: manga.wiki_id,
-            disable_coupon_amount: manga.disable_coupon_amount,
-            japan_comic: manga.japan_comic,
-            interact_value: manga.interact_value,
-            temporary_finish_time: manga.temporary_finish_time,
-            introduction: manga.introduction,
-            comment_status: manga.comment_status,
-            no_screenshot: manga.no_screenshot,
-            type_field: manga.type_field,
-            no_rank: manga.no_rank,
-            presale_text: manga.presale_text,
-            presale_discount: manga.presale_discount,
-            no_leaderboard: manga.no_leaderboard,
+            serial_status: comic.serial_status,
+            album_count: comic.album_count,
+            wiki_id: comic.wiki_id,
+            disable_coupon_amount: comic.disable_coupon_amount,
+            japan_comic: comic.japan_comic,
+            interact_value: comic.interact_value,
+            temporary_finish_time: comic.temporary_finish_time,
+            introduction: comic.introduction,
+            comment_status: comic.comment_status,
+            no_screenshot: comic.no_screenshot,
+            type_field: comic.type_field,
+            no_rank: comic.no_rank,
+            presale_text: comic.presale_text,
+            presale_discount: comic.presale_discount,
+            no_leaderboard: comic.no_leaderboard,
             auto_pay_info,
-            orientation: manga.orientation,
+            orientation: comic.orientation,
             story_elems,
             tags,
-            is_star_hall: manga.is_star_hall,
-            hall_icon_text: manga.hall_icon_text,
+            is_star_hall: comic.is_star_hall,
+            hall_icon_text: comic.hall_icon_text,
             rookie_fav_tip,
             authors,
-            comic_alias: manga.comic_alias,
-            horizontal_covers: manga.horizontal_covers,
+            comic_alias: comic.comic_alias,
+            horizontal_covers: comic.horizontal_covers,
             data_info,
-            last_short_title_msg: manga.last_short_title_msg,
+            last_short_title_msg: comic.last_short_title_msg,
         }
     }
     fn get_episode_title(ep: &EpisodeRespData) -> String {
@@ -374,8 +380,8 @@ impl Manga {
 pub struct EpisodeInfo {
     pub episode_id: i64,
     pub episode_title: String,
-    pub manga_id: i64,
-    pub manga_title: String,
+    pub comic_id: i64,
+    pub comic_title: String,
     pub is_locked: bool,
     pub is_downloaded: bool,
 }
@@ -484,4 +490,41 @@ pub struct Increase {
     pub days: i64,
     #[serde(rename = "increase_percent")]
     pub increase_percent: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct QrcodeStatus {
+    pub code: i64,
+    pub message: String,
+    #[serde(rename = "is_new")]
+    pub is_new: bool,
+    pub mid: i64,
+    #[serde(rename = "access_token")]
+    pub access_token: String,
+    #[serde(rename = "refresh_token")]
+    pub refresh_token: String,
+    #[serde(rename = "expires_in")]
+    pub expires_in: i64,
+    #[serde(rename = "token_info")]
+    pub token_info: TokenInfoRespData,
+    #[serde(rename = "cookie_info")]
+    pub cookie_info: CookieInfoRespData,
+    pub sso: Vec<String>,
+}
+impl QrcodeStatus {
+    pub fn from(bili_resp: BiliResp, qrcode_status_resp_data: QrcodeStatusRespData) -> Self {
+        Self {
+            code: bili_resp.code,
+            message: bili_resp.msg,
+            is_new: qrcode_status_resp_data.is_new,
+            mid: qrcode_status_resp_data.mid,
+            access_token: qrcode_status_resp_data.access_token,
+            refresh_token: qrcode_status_resp_data.refresh_token,
+            expires_in: qrcode_status_resp_data.expires_in,
+            token_info: qrcode_status_resp_data.token_info,
+            cookie_info: qrcode_status_resp_data.cookie_info,
+            sso: qrcode_status_resp_data.sso,
+        }
+    }
 }

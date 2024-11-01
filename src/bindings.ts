@@ -27,33 +27,25 @@ async generateQrcode() : Promise<Result<QrcodeData, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async getQrcodeStatus(qrcodeKey: string) : Promise<Result<QrcodeStatusRespData, CommandError>> {
+async getQrcodeStatus(authCode: string) : Promise<Result<QrcodeStatus, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_qrcode_status", { qrcodeKey }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_qrcode_status", { authCode }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async getBuvid3() : Promise<Result<Buvid3RespData, CommandError>> {
+async search(keyword: string, pageNum: number) : Promise<Result<SearchRespData, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_buvid3") };
+    return { status: "ok", data: await TAURI_INVOKE("search", { keyword, pageNum }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async searchManga(keyword: string, pageNum: number) : Promise<Result<SearchMangaRespData, CommandError>> {
+async getComic(comicId: number) : Promise<Result<Comic, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("search_manga", { keyword, pageNum }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
-async getManga(id: number) : Promise<Result<Manga, CommandError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("get_manga", { id }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_comic", { comicId }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -124,9 +116,12 @@ export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
 export type AutoPayOrder = { id: number; title: string }
 export type BannerRespData = { icon: string; title: string; url: string }
-export type Buvid3RespData = { buvid: string }
+export type Comic = { id: number; title: string; comic_type: number; page_default: number; page_allow: number; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; last_ord: number; is_finish: number; status: number; fav: number; read_order: number; evaluate: string; total: number; episodeInfos: EpisodeInfo[]; release_time: string; is_limit: number; read_epid: number; last_read_time: string; is_download: number; read_short_title: string; styles2: Styles2[]; renewal_time: string; last_short_title: string; discount_type: number; discount: number; discount_end: string; no_reward: boolean; batch_discount_type: number; ep_discount_type: number; has_fav_activity: boolean; fav_free_amount: number; allow_wait_free: boolean; wait_hour: number; wait_free_at: string; no_danmaku: number; auto_pay_status: number; no_month_ticket: boolean; immersive: boolean; no_discount: boolean; show_type: number; pay_mode: number; classic_lines: string; pay_for_new: number; fav_comic_info: FavComicInfo; serial_status: number; album_count: number; wiki_id: number; disable_coupon_amount: number; japan_comic: boolean; interact_value: string; temporary_finish_time: string; introduction: string; comment_status: number; no_screenshot: boolean; type: number; no_rank: boolean; presale_text: string; presale_discount: number; no_leaderboard: boolean; auto_pay_info: AutoPayInfo; orientation: number; story_elems: StoryElem[]; tags: Tag[]; is_star_hall: number; hall_icon_text: string; rookie_fav_tip: RookieFavTip; authors: Author[]; comic_alias: string[]; horizontal_covers: string[]; data_info: DataInfo; last_short_title_msg: string }
+export type ComicInSearchRespData = { id: number; title: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData }
 export type CommandError = string
-export type Config = { sessdata: string; buvid3: string; downloadDir: string }
+export type Config = { accessToken: string; downloadDir: string }
+export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
+export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
 export type DataInfo = { read_score: ReadScore; interactive_value: InteractiveValue }
 export type DownloadEpisodeEndEvent = DownloadEpisodeEndEventPayload
 export type DownloadEpisodeEndEventPayload = { epId: number; errMsg: string | null }
@@ -140,16 +135,14 @@ export type DownloadImageSuccessEvent = DownloadImageSuccessEventPayload
 export type DownloadImageSuccessEventPayload = { epId: number; url: string; current: number }
 export type DownloadSpeedEvent = DownloadSpeedEventPayload
 export type DownloadSpeedEventPayload = { speed: string }
-export type EpisodeInfo = { episodeId: number; episodeTitle: string; mangaId: number; mangaTitle: string; isLocked: boolean; isDownloaded: boolean }
+export type EpisodeInfo = { episodeId: number; episodeTitle: string; comicId: number; comicTitle: string; isLocked: boolean; isDownloaded: boolean }
 export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number; fav_coupon_type: number }
 export type Increase = { days: number; increase_percent: number }
 export type InteractiveValue = { interact_value: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
-export type Manga = { id: number; title: string; comic_type: number; page_default: number; page_allow: number; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; last_ord: number; is_finish: number; status: number; fav: number; read_order: number; evaluate: string; total: number; episodeInfos: EpisodeInfo[]; release_time: string; is_limit: number; read_epid: number; last_read_time: string; is_download: number; read_short_title: string; styles2: Styles2[]; renewal_time: string; last_short_title: string; discount_type: number; discount: number; discount_end: string; no_reward: boolean; batch_discount_type: number; ep_discount_type: number; has_fav_activity: boolean; fav_free_amount: number; allow_wait_free: boolean; wait_hour: number; wait_free_at: string; no_danmaku: number; auto_pay_status: number; no_month_ticket: boolean; immersive: boolean; no_discount: boolean; show_type: number; pay_mode: number; classic_lines: string; pay_for_new: number; fav_comic_info: FavComicInfo; serial_status: number; album_count: number; wiki_id: number; disable_coupon_amount: number; japan_comic: boolean; interact_value: string; temporary_finish_time: string; introduction: string; comment_status: number; no_screenshot: boolean; type: number; no_rank: boolean; presale_text: string; presale_discount: number; no_leaderboard: boolean; auto_pay_info: AutoPayInfo; orientation: number; story_elems: StoryElem[]; tags: Tag[]; is_star_hall: number; hall_icon_text: string; rookie_fav_tip: RookieFavTip; authors: Author[]; comic_alias: string[]; horizontal_covers: string[]; data_info: DataInfo; last_short_title_msg: string }
-export type MangaInSearchRespData = { id: number; title: string; org_title: string; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData; numbers: number; jump_value: string; real_title: string }
-export type QrcodeData = { base64: string; qrcodeKey: string }
-export type QrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
+export type NovelInSearchRespData = { novel_id: number; title: string; v_cover: string; finish_status: number; status: number; discount_type: number; numbers: number; style: StyleRespData; evaluate: string; author: string; tag: TagRespData }
+export type QrcodeData = { base64: string; auth_code: string }
+export type QrcodeStatus = { code: number; message: string; is_new: boolean; mid: number; access_token: string; refresh_token: string; expires_in: number; token_info: TokenInfoRespData; cookie_info: CookieInfoRespData; sso: string[] }
 export type ReadScore = { read_score: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
-export type RecommendRespData = { id: number; title: string; horizontal_cover: string; square_cover: string; vertical_cover: string; last_short_title: string; recommendation: string; is_finish: number; total: number; allow_wait_free: boolean; author_name: string[]; styles: string[]; discount_type: number }
 export type RemoveWatermarkEndEvent = RemoveWatermarkEndEventPayload
 export type RemoveWatermarkEndEventPayload = { dirPath: string }
 export type RemoveWatermarkErrorEvent = RemoveWatermarkErrorEventPayload
@@ -159,13 +152,18 @@ export type RemoveWatermarkStartEventPayload = { dirPath: string; total: number 
 export type RemoveWatermarkSuccessEvent = RemoveWatermarkSuccessEventPayload
 export type RemoveWatermarkSuccessEventPayload = { dirPath: string; imgPath: string; current: number }
 export type RookieFavTip = { is_show: boolean; used: number; total: number }
-export type SearchMangaRespData = { list: MangaInSearchRespData[]; total_page: number; total_num: number; recommends: RecommendRespData[]; similar: string; se_id: string; banner: BannerRespData }
+export type SearchComicRespData = { list: ComicInSearchRespData[]; total_page: number; total_num: number; similar: string; se_id: string; banner: BannerRespData }
+export type SearchNovelRespData = { total: number; list: NovelInSearchRespData[] }
+export type SearchRespData = { comic_data: SearchComicRespData; novel_data: SearchNovelRespData }
 export type StoryElem = { id: number; name: string }
+export type StyleRespData = { id: number; name: string }
 export type Styles2 = { id: number; name: string }
 export type Tag = { id: number; name: string }
+export type TagRespData = { id: number; name: string }
+export type TokenInfoRespData = { mid: number; access_token: string; refresh_token: string; expires_in: number }
 export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
 export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
-export type UserProfileRespData = { isLogin: boolean; face: string; uname: string }
+export type UserProfileRespData = { face: string; name: string }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/

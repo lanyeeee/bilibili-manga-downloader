@@ -1,49 +1,49 @@
 <script setup lang="ts">
-import {ref, computed} from "vue";
-import {commands, Manga, SearchMangaRespData} from "../bindings.ts";
+import {computed, ref} from "vue";
+import {Comic, commands, SearchRespData} from "../bindings.ts";
 import {useNotification} from "naive-ui";
-import MangaCard from "./MangaCard.vue";
+import ComicCard from "./ComicCard.vue";
 
 const notification = useNotification();
 
-const searchMangaRespData = ref<SearchMangaRespData>();
+const searchRespData = ref<SearchRespData>();
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
-const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
+const selectedComic = defineModel<Comic | undefined>("selectedComic", {required: true});
 
 const searchInput = ref<string>("");
-const mangaIdInput = ref<string>("");
+const comicIdInput = ref<string>("");
 const searchPage = ref<number>(1);
 
 const searchPageCount = computed(() => {
-  if (searchMangaRespData.value === undefined) {
+  if (searchRespData.value === undefined) {
     return 0;
   }
-  const total = searchMangaRespData.value.total_num;
+  const total = searchRespData.value.comic_data.total_num;
   return Math.floor(total / 20) + 1;
 });
 
 async function searchByKeyword(keyword: string, pageNum: number) {
   searchPage.value = pageNum;
-  let result = await commands.searchManga(keyword, pageNum);
+  let result = await commands.search(keyword, pageNum);
   if (result.status === "error") {
     notification.error({title: "搜索失败", description: result.error});
     return;
   }
 
-  searchMangaRespData.value = result.data;
-  console.log("searchData", searchMangaRespData.value);
+  searchRespData.value = result.data;
+  console.log("searchData", searchRespData.value);
 }
 
-async function searchById(id: number) {
-  let result = await commands.getManga(id);
+async function searchById(comicId: number) {
+  let result = await commands.getComic(comicId);
   if (result.status === "error") {
     notification.error({title: "获取漫画章节详情失败", description: result.error});
     return;
   }
 
-  selectedManga.value = result.data;
+  selectedComic.value = result.data;
   currentTabName.value = "episode";
-  searchMangaRespData.value = undefined;
+  searchRespData.value = undefined;
 }
 
 </script>
@@ -66,24 +66,24 @@ async function searchById(id: number) {
       <div class="min-w-2"></div>
       <n-input class="text-align-left"
                size="tiny"
-               v-model:value="mangaIdInput"
+               v-model:value="comicIdInput"
                placeholder=""
                clearable
-               @keydown.enter="searchById(Number(mangaIdInput.trim()))"
+               @keydown.enter="searchById(Number(comicIdInput.trim()))"
       >
         <template #prefix>
           漫画ID:
         </template>
       </n-input>
-      <n-button size="tiny" @click="searchById(Number(mangaIdInput.trim()))">直达</n-button>
+      <n-button size="tiny" @click="searchById(Number(comicIdInput.trim()))">直达</n-button>
     </div>
-    <div v-if="searchMangaRespData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
+    <div v-if="searchRespData!==undefined" class="flex flex-col gap-row-1 overflow-auto p-2">
       <div class="flex flex-col gap-row-2 overflow-auto">
-        <manga-card v-for="mangaInSearch in searchMangaRespData.list"
-                    :key="mangaInSearch.id"
-                    :manga-info="mangaInSearch"
+        <comic-card v-for="comicInSearch in searchRespData.comic_data.list"
+                    :key="comicInSearch.id"
+                    :comic-info="comicInSearch"
                     v-model:current-tab-name="currentTabName"
-                    v-model:selected-manga="selectedManga"/>
+                    v-model:selected-comic="selectedComic"/>
       </div>
       <n-pagination :page-count="searchPageCount"
                     :page="searchPage"

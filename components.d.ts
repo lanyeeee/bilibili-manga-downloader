@@ -7,9 +7,9 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ComicCard: typeof import('./src/components/ComicCard.vue')['default']
     DownloadingList: typeof import('./src/components/DownloadingList.vue')['default']
     EpisodePane: typeof import('./src/components/EpisodePane.vue')['default']
-    MangaCard: typeof import('./src/components/MangaCard.vue')['default']
     NAvatar: typeof import('naive-ui')['NAvatar']
     NButton: typeof import('naive-ui')['NButton']
     NCard: typeof import('naive-ui')['NCard']
@@ -18,7 +18,6 @@ declare module 'vue' {
     NDivider: typeof import('naive-ui')['NDivider']
     NDropdown: typeof import('naive-ui')['NDropdown']
     NEmpty: typeof import('naive-ui')['NEmpty']
-    NH3: typeof import('naive-ui')['NH3']
     NInput: typeof import('naive-ui')['NInput']
     NMessageProvider: typeof import('naive-ui')['NMessageProvider']
     NModal: typeof import('naive-ui')['NModal']
