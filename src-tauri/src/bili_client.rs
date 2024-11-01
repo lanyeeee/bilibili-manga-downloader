@@ -16,8 +16,8 @@ use url::form_urlencoded;
 use crate::config::Config;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData, SearchRespData,
-    UserProfileRespData,
+    BiliResp, ComicRespData, GenerateQrcodeRespData, ImageIndexRespData, ImageTokenRespData,
+    QrcodeStatusRespData, SearchRespData, UserProfileRespData,
 };
 use crate::types::{Comic, QrcodeData, QrcodeStatus};
 
@@ -263,6 +263,106 @@ impl BiliClient {
         let comic = Comic::from_comic_resp_data(&self.app, comic_resp_data);
 
         Ok(comic)
+    }
+
+    pub async fn get_image_index(&self, episode_id: i64) -> anyhow::Result<ImageIndexRespData> {
+        let access_token = self.access_token();
+        let params = json!({
+            "device": "android",
+            "access_key": access_token,
+        });
+        let payload = json!({"epId": episode_id});
+        // 发送获取ImageIndexRespData的请求
+        let http_resp = Self::client()
+            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
+            .query(&params)
+            .json(&payload)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+                "获取章节 `{episode_id}` 的ImageIndex失败，预料之外的状态码({status}): {body}"
+            ));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
+            "获取章节 `{episode_id}` 的ImageIndex失败，将body解析为BiliResp失败: {body}"
+        ))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!(
+                "获取章节 `{episode_id}` 的ImageIndex失败，预料之外的code: {bili_resp:?}"
+            ));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!(
+                "获取章节 `{episode_id}` 的ImageIndex失败，data字段不存在: {bili_resp:?}"
+            ));
+        };
+        // 尝试将data解析为ImageIndexRespData
+        let data_str = data.to_string();
+        let image_index_data = serde_json::from_str::<ImageIndexRespData>(&data_str).context(format!(
+            "获取章节 `{episode_id}` 的ImageIndex失败，将data解析为ImageIndexRespData失败: {data_str}"
+        ))?;
+
+        Ok(image_index_data)
+    }
+
+    pub async fn get_image_token(
+        &self,
+        image_index_data: &ImageIndexRespData,
+    ) -> anyhow::Result<ImageTokenRespData> {
+        let access_token = self.access_token();
+        let params = json!({
+            "mobi_app": "android_comic",
+            "version": "6.5.0",
+            "access_key": access_token,
+        });
+        let urls: Vec<String> = image_index_data
+            .images
+            .iter()
+            .map(|img| img.path.clone())
+            .collect();
+        let urls_str = serde_json::to_string(&urls)?;
+        let payload = json!({"urls": urls_str});
+        // 发送获取ImageToken的请求
+        let http_resp = Self::client()
+            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken")
+            .query(&params)
+            .json(&payload)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+                "获取ImageToken失败，预料之外的状态码({status}): {body}"
+            ));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
+            "获取ImageToken失败，将body解析为BiliResp失败: {body}"
+        ))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!("获取ImageToken失败，预料之外的code: {bili_resp:?}"));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!("获取ImageToken失败，data字段不存在: {bili_resp:?}"));
+        };
+        // 尝试将data解析为ImageTokenRespData
+        let data_str = data.to_string();
+        let image_token_data = serde_json::from_str::<ImageTokenRespData>(&data_str).context(
+            format!("获取ImageToken失败，将data解析为ImageTokenRespData失败: {data_str}"),
+        )?;
+
+        Ok(image_token_data)
     }
 
     fn access_token(&self) -> String {
