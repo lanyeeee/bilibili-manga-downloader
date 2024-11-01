@@ -1,5 +1,9 @@
+use crate::config::Config;
 use crate::errors::CommandResult;
-use crate::responses::{BiliResp, GenerateQrcodeRespData, QrcodeStatusRespData};
+use crate::extensions::IgnoreRwLockPoison;
+use crate::responses::{
+    BiliResp, GenerateQrcodeRespData, QrcodeStatusRespData, UserProfileRespData,
+};
 use crate::types::{QrcodeData, QrcodeStatus};
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
@@ -9,8 +13,9 @@ use qrcode::QrCode;
 use reqwest::{Client, ClientBuilder, StatusCode};
 use std::collections::BTreeMap;
 use std::io::Cursor;
+use std::sync::RwLock;
 use std::time::Duration;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use url::form_urlencoded;
 
 const APP_KEY: &str = "cc8617fd6961e070";
@@ -129,6 +134,55 @@ impl BiliClient {
         let qrcode_status = QrcodeStatus::from(bili_resp, qrcode_status_resp_data);
 
         Ok(qrcode_status)
+    }
+
+    pub async fn get_user_profile(&self) -> anyhow::Result<UserProfileRespData> {
+        let access_token = self.access_token();
+        let mut form = BTreeMap::new();
+        form.insert("access_key".to_string(), access_token);
+        form.insert("ts".to_string(), "0".to_string());
+        let signed_form = app_sign(form);
+        // 发送获取用户信息请求
+        let http_resp = Self::client()
+            .get("https://app.bilibili.com/x/v2/account/myinfo")
+            .query(&signed_form)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+                "获取用户信息失败，预料之外的状态码({status}): {body}"
+            ));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body)
+            .context(format!("将body解析为BiliResp失败: {body}"))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!("获取用户信息失败，预料之外的code: {bili_resp:?}"));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!("获取用户信息失败，data字段不存在: {bili_resp:?}"));
+        };
+        // 尝试将data解析为UserProfileRespData
+        let data_str = data.to_string();
+        let user_profile_resp_data = serde_json::from_str::<UserProfileRespData>(&data_str)
+            .context(format!(
+                "获取用户信息失败，将data解析为UserProfileRespData失败: {data_str}"
+            ))?;
+
+        Ok(user_profile_resp_data)
+    }
+
+    fn access_token(&self) -> String {
+        self.app
+            .state::<RwLock<Config>>()
+            .read_or_panic()
+            .access_token
+            .clone()
     }
 }
 
