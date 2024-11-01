@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import {SelectionArea, SelectionEvent, SelectionOptions} from "@viselect/vue";
 import {nextTick, ref, watch} from "vue";
-import {commands, Manga} from "../bindings.ts";
+import {commands, Comic} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 
 const notification = useNotification();
 
-const selectedManga = defineModel<Manga | undefined>("selectedManga", {required: true});
+const selectedManga = defineModel<Comic | undefined>("selectedManga", {required: true});
 
 const dropdownX = ref<number>(0);
 const dropdownY = ref<number>(0);
@@ -103,7 +103,7 @@ async function refreshEpisodes() {
   if (selectedManga.value === undefined) {
     return;
   }
-  const result = await commands.getManga(selectedManga.value.id);
+  const result = await commands.getComic(selectedManga.value.id);
   if (result.status === "error") {
     notification.error({title: "获取漫画章节详情失败", description: result.error});
     return;

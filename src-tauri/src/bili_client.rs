@@ -2,9 +2,10 @@ use crate::config::Config;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, GenerateQrcodeRespData, QrcodeStatusRespData, SearchRespData, UserProfileRespData,
+    BiliResp, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData, SearchRespData,
+    UserProfileRespData,
 };
-use crate::types::{QrcodeData, QrcodeStatus};
+use crate::types::{Comic, QrcodeData, QrcodeStatus};
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -178,11 +179,7 @@ impl BiliClient {
         Ok(user_profile_resp_data)
     }
 
-    pub async fn search(
-        &self,
-        keyword: &str,
-        page_num: i64,
-    ) -> anyhow::Result<SearchRespData> {
+    pub async fn search(&self, keyword: &str, page_num: i64) -> anyhow::Result<SearchRespData> {
         let payload = json!({
             "keyword": keyword,
             "pageNum": page_num,
@@ -213,11 +210,55 @@ impl BiliClient {
         };
         // 尝试将data解析为SearchRespData
         let data_str = data.to_string();
-        let search_manga_resp_data = serde_json::from_str::<SearchRespData>(&data_str).context(
+        let search_resp_data = serde_json::from_str::<SearchRespData>(&data_str).context(
             format!("搜索漫画失败，将data解析为SearchRespData失败: {data_str}"),
         )?;
 
-        Ok(search_manga_resp_data)
+        Ok(search_resp_data)
+    }
+
+    pub async fn get_comic(&self, comic_id: i64) -> anyhow::Result<Comic> {
+        let access_token = self.access_token();
+        let payload = json!({"comic_id": comic_id});
+        let params = json!({
+            "device": "android",
+            "access_key": access_token,
+        });
+        // 发送获取漫画详情请求
+        let http_res = Self::client()
+            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail")
+            .json(&payload)
+            .query(&params)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_res.status();
+        let body = http_res.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+                "获取漫画详情失败，预料之外的状态码({status}): {body}"
+            ));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
+            "获取漫画详情失败，将body解析为BiliResp失败: {body}"
+        ))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!("获取漫画详情失败，预料之外的code: {bili_resp:?}"));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!("获取漫画详情失败，data字段不存在: {bili_resp:?}"));
+        };
+        // 尝试将data解析为ComicRespData
+        let data_str = data.to_string();
+        let comic_resp_data = serde_json::from_str::<ComicRespData>(&data_str).context(format!(
+            "获取漫画详情失败，将data解析为ComicRespData失败: {data_str}"
+        ))?;
+        let comic = Comic::from_comic_resp_data(&self.app, comic_resp_data);
+
+        Ok(comic)
     }
 
     fn access_token(&self) -> String {

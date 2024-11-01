@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {commands, Config, Manga, UserProfileRespData} from "./bindings.ts";
+import {commands, Config, Comic, UserProfileRespData} from "./bindings.ts";
 import {ref, onMounted, watch} from "vue";
 import {useNotification, useMessage} from "naive-ui";
 import QrcodeViewer from "./components/QrcodeViewer.vue";
@@ -15,7 +15,7 @@ const message = useMessage();
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
-const selectedManga = ref<Manga>();
+const selectedManga = ref<Comic>();
 const userProfile = ref<UserProfileRespData>();
 
 watch(config, async () => {
@@ -70,7 +70,7 @@ async function showConfigInFileManager() {
 }
 
 async function test() {
-  const result = await commands.getManga(26470);
+  const result = await commands.getComic(26731);
   console.log(result);
 }
 
