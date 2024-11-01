@@ -4,7 +4,7 @@ use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, Buvid3RespData, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData,
+    BiliResp, ComicRespData, GenerateQrcodeRespData, QrcodeStatusRespData,
     SearchRespData, UserProfileRespData,
 };
 use crate::types::{Comic, EpisodeInfo, QrcodeData, QrcodeStatus};
@@ -72,40 +72,6 @@ pub async fn get_user_profile(
 ) -> CommandResult<UserProfileRespData> {
     let user_profile_resp_data = bili_client.get_user_profile().await?;
     Ok(user_profile_resp_data)
-}
-
-#[tauri::command(async)]
-#[specta::specta]
-pub async fn get_buvid3() -> CommandResult<Buvid3RespData> {
-    // 发送获取buvid3请求
-    let http_resp = reqwest::Client::new()
-        .get("https://api.bilibili.com/x/web-frontend/getbuvid")
-        .send()
-        .await?;
-    // 检查http响应状态码
-    let status = http_resp.status();
-    let body = http_resp.text().await?;
-    if status != StatusCode::OK {
-        return Err(anyhow!("获取buvid3失败，预料之外的状态码({status}): {body}").into());
-    }
-    // 尝试将body解析为BiliResp
-    let bili_resp = from_str::<BiliResp>(&body)
-        .context(format!("获取buvid3失败，将body解析为BiliResp失败: {body}"))?;
-    // 检查BiliResp的code字段
-    if bili_resp.code != 0 {
-        return Err(anyhow!("获取buvid3失败，预料之外的code: {bili_resp:?}").into());
-    }
-    // 检查BiliResp的data是否存在
-    let Some(data) = bili_resp.data else {
-        return Err(anyhow!("获取buvid3失败，data字段不存在: {bili_resp:?}").into());
-    };
-    // 尝试将data解析为Buvid3RespData
-    let data_str = data.to_string();
-    let buvid3_resp_data = from_str::<Buvid3RespData>(&data_str).context(format!(
-        "获取buvid3失败，将data解析为Buvid3RespData失败: {data_str}"
-    ))?;
-
-    Ok(buvid3_resp_data)
 }
 
 #[tauri::command(async)]

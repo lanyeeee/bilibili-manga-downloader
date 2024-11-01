@@ -29,7 +29,6 @@ pub fn run() {
             save_config,
             generate_qrcode,
             get_qrcode_status,
-            get_buvid3,
             search,
             get_comic,
             download_episodes,
