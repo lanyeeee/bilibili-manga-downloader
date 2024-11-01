@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import {MangaInfo} from "../types.ts";
+import {ComicInfo} from "../types.ts";
 import {commands, Comic} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 
 const notification = useNotification();
 
 defineProps<{
-  mangaInfo: MangaInfo;
+  comicInfo: ComicInfo;
 }>();
 
 const currentTabName = defineModel<"search" | "episode">("currentTabName", {required: true});
-const selectedManga = defineModel<Comic | undefined>("selectedManga", {required: true});
+const selectedComic = defineModel<Comic | undefined>("selectedComic", {required: true});
 
 async function onClickItem(comicId: number) {
   const result = await commands.getComic(comicId);
@@ -18,7 +18,7 @@ async function onClickItem(comicId: number) {
     notification.error({title: "获取漫画详情失败", description: result.error});
     return;
   }
-  selectedManga.value = result.data;
+  selectedComic.value = result.data;
   currentTabName.value = "episode";
 }
 
@@ -29,17 +29,17 @@ async function onClickItem(comicId: number) {
     <div class="flex">
       <img
           class="w-24 aspect-[3/4] object-contain mr-4 cursor-pointer transform transition-transform duration-200 hover:scale-106"
-          :src="mangaInfo.vertical_cover"
+          :src="comicInfo.vertical_cover"
           alt=""
           referrerpolicy="no-referrer"
-          @click="onClickItem(mangaInfo.id)"/>
+          @click="onClickItem(comicInfo.id)"/>
       <div class="flex flex-col">
-        <span v-html="mangaInfo.title"
+        <span v-html="comicInfo.title"
               class="font-bold text-xl line-clamp-2 cursor-pointer transition-colors duration-200 hover:text-blue-5"
-              @click="onClickItem(mangaInfo.id)"/>
-        <span v-html="mangaInfo.author_name"/>
-        <span v-html="mangaInfo.styles"/>
-        <span>{{ mangaInfo.is_finish ? "已完结" : "连载中" }}</span>
+              @click="onClickItem(comicInfo.id)"/>
+        <span v-html="comicInfo.author_name"/>
+        <span v-html="comicInfo.styles"/>
+        <span>{{ comicInfo.is_finish ? "已完结" : "连载中" }}</span>
       </div>
     </div>
   </n-card>
