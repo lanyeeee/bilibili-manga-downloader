@@ -1,14 +1,16 @@
+use std::sync::RwLock;
+
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri::{AppHandle, Manager};
+
 use crate::config::Config;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, CookieInfoRespData, EpisodeRespData, ComicRespData, QrcodeStatusRespData,
+    BiliResp, ComicRespData, CookieInfoRespData, EpisodeRespData, QrcodeStatusRespData,
     TokenInfoRespData,
 };
 use crate::utils::filename_filter;
-use serde::{Deserialize, Serialize};
-use specta::Type;
-use std::sync::RwLock;
-use tauri::{AppHandle, Manager};
 
 #[derive(Default, Debug, Clone, PartialEq, Deserialize, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
