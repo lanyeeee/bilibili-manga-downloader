@@ -91,8 +91,8 @@ impl DownloadManager {
         let config = self.app.state::<RwLock<Config>>();
         let cookie = config.read_or_panic().get_cookie();
 
-        let image_index_data = get_image_index_data(ep_info.episode_id, &cookie).await?;
-        let image_token_data = get_image_token_data(&image_index_data, &cookie).await?;
+        let image_index_resp_data = self.get_image_index(ep_info.episode_id).await?;
+        let image_token_data = get_image_token_data(&image_index_resp_data, &cookie).await?;
 
         let temp_download_dir = get_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
@@ -102,7 +102,6 @@ impl DownloadManager {
             .into_iter()
             .map(|data| data.complete_url)
             .collect();
-        println!("urls: {:?}", urls);
         let total = urls.len() as u32;
         // 记录总共需要下载的图片数量
         self.total_image_count.fetch_add(total, Ordering::Relaxed);
@@ -164,6 +163,53 @@ impl DownloadManager {
         Ok(())
     }
 
+    async fn get_image_index(&self, episode_id: i64) -> anyhow::Result<ImageIndexRespData> {
+        let access_token = self.access_token();
+        let payload = json!({"epId": episode_id});
+        let params = json!({
+            "device": "android",
+            "access_key": access_token,
+        });
+        // 发送获取ImageIndexRespData的请求
+        let http_resp = reqwest::Client::new()
+            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
+            .json(&payload)
+            .query(&params)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+            "获取章节 `{episode_id}` 的ImageIndexRespData失败，预料之外的状态码({status}): {body}"
+        ));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
+            "获取章节 `{episode_id}` 的ImageIndexRespData失败，将body解析为BiliResp失败: {body}"
+        ))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!(
+                "获取章节 `{episode_id}` 的ImageIndexRespData失败，预料之外的code: {bili_resp:?}"
+            ));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!(
+                "获取章节 `{episode_id}` 的ImageIndexRespData失败，data字段不存在: {bili_resp:?}"
+            ));
+        };
+        // 尝试将data解析为ImageIndexRespData
+        let data_str = data.to_string();
+        let image_index_data = serde_json::from_str::<ImageIndexRespData>(&data_str).context(format!(
+            "获取章节 `{episode_id}` 的ImageIndexRespData失败，将data解析为ImageIndexRespData失败: {data_str}"
+        ))?;
+
+        Ok(image_index_data)
+    }
+
     // TODO: 把current变量名改成downloaded_count比较合适
     async fn download_image(
         self,
@@ -208,6 +254,14 @@ impl DownloadManager {
             current,
         );
     }
+
+    fn access_token(&self) -> String {
+        self.app
+            .state::<RwLock<Config>>()
+            .read_or_panic()
+            .access_token
+            .clone()
+    }
 }
 
 fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
@@ -232,50 +286,6 @@ async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
     let image_data = http_res.bytes().await?;
 
     Ok(image_data)
-}
-
-async fn get_image_index_data(episode_id: i64, cookie: &str) -> anyhow::Result<ImageIndexRespData> {
-    let payload = json!({"ep_id": episode_id});
-    // 发送获取ImageIndexRespData的请求
-    let http_resp = reqwest::Client::new()
-        .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
-        .query(&[("device", "pc"), ("platform", "web")])
-        .header("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
-        .header("cookie", cookie)
-        .json(&payload)
-        .send()
-        .await?;
-    // 检查http响应状态码
-    let status = http_resp.status();
-    let body = http_resp.text().await?;
-    if status != StatusCode::OK {
-        return Err(anyhow!(
-            "获取章节 `{episode_id}` 的ImageIndexRespData失败，预料之外的状态码({status}): {body}"
-        ));
-    }
-    // 尝试将body解析为BiliResp
-    let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
-        "获取章节 `{episode_id}` 的ImageIndexRespData失败，将body解析为BiliResp失败: {body}"
-    ))?;
-    // 检查BiliResp的code字段
-    if bili_resp.code != 0 {
-        return Err(anyhow!(
-            "获取章节 `{episode_id}` 的ImageIndexRespData失败，预料之外的code: {bili_resp:?}"
-        ));
-    }
-    // 检查BiliResp的data是否存在
-    let Some(data) = bili_resp.data else {
-        return Err(anyhow!(
-            "获取章节 `{episode_id}` 的ImageIndexRespData失败，data字段不存在: {bili_resp:?}"
-        ));
-    };
-    // 尝试将data解析为ImageIndexRespData
-    let data_str = data.to_string();
-    let image_index_data = serde_json::from_str::<ImageIndexRespData>(&data_str).context(format!(
-        "获取章节 `{episode_id}` 的ImageIndexRespData失败，将data解析为ImageIndexRespData失败: {data_str}"
-    ))?;
-
-    Ok(image_index_data)
 }
 
 async fn get_image_token_data(
