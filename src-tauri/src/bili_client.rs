@@ -40,14 +40,14 @@ impl BiliClient {
     }
 
     pub async fn generate_qrcode(&self) -> anyhow::Result<QrcodeData> {
-        let mut form = BTreeMap::new();
-        form.insert("ts".to_string(), "0".to_string());
-        form.insert("local_id".to_string(), "0".to_string());
-        let signed_form = app_sign(form);
+        let mut params = BTreeMap::new();
+        params.insert("ts".to_string(), "0".to_string());
+        params.insert("local_id".to_string(), "0".to_string());
+        let signed_params = app_sign(params);
         // 发送生成二维码请求
         let http_resp = Self::client()
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/auth_code")
-            .query(&signed_form)
+            .query(&signed_params)
             .send()
             .await?;
         // 检查http响应状态码
@@ -92,15 +92,15 @@ impl BiliClient {
     }
 
     pub async fn get_qrcode_status(&self, auth_code: String) -> anyhow::Result<QrcodeStatus> {
-        let mut form = BTreeMap::new();
-        form.insert("auth_code".to_string(), auth_code);
-        form.insert("ts".to_string(), "0".to_string());
-        form.insert("local_id".to_string(), "0".to_string());
-        let signed_form = app_sign(form);
+        let mut params = BTreeMap::new();
+        params.insert("auth_code".to_string(), auth_code);
+        params.insert("ts".to_string(), "0".to_string());
+        params.insert("local_id".to_string(), "0".to_string());
+        let signed_params = app_sign(params);
         // 发送获取二维码状态请求
         let http_res = Self::client()
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/poll")
-            .query(&signed_form)
+            .query(&signed_params)
             .send()
             .await?;
         // 检查http响应状态码
@@ -138,14 +138,14 @@ impl BiliClient {
 
     pub async fn get_user_profile(&self) -> anyhow::Result<UserProfileRespData> {
         let access_token = self.access_token();
-        let mut form = BTreeMap::new();
-        form.insert("access_key".to_string(), access_token);
-        form.insert("ts".to_string(), "0".to_string());
-        let signed_form = app_sign(form);
+        let mut params = BTreeMap::new();
+        params.insert("access_key".to_string(), access_token);
+        params.insert("ts".to_string(), "0".to_string());
+        let signed_params = app_sign(params);
         // 发送获取用户信息请求
         let http_resp = Self::client()
             .get("https://app.bilibili.com/x/v2/account/myinfo")
-            .query(&signed_form)
+            .query(&signed_params)
             .send()
             .await?;
         // 检查http响应状态码
