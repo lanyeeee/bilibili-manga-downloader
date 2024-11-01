@@ -531,7 +531,6 @@ pub struct ImageTokenItemRespData {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct UserProfileRespData {
-    pub is_login: bool,
     pub face: String,
-    pub uname: String,
+    pub name: String,
 }

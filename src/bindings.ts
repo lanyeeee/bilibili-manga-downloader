@@ -168,7 +168,7 @@ export type Tag = { id: number; name: string }
 export type TokenInfoRespData = { mid: number; access_token: string; refresh_token: string; expires_in: number }
 export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
 export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
-export type UserProfileRespData = { isLogin: boolean; face: string; uname: string }
+export type UserProfileRespData = { face: string; name: string }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/

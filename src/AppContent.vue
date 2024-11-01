@@ -92,7 +92,7 @@ async function test() {
                   :img-props="{referrerpolicy: 'no-referrer'}"
                   :size="32"
                   :src="userProfile.face"/>
-        <span class="whitespace-nowrap">{{ userProfile.uname }}</span>
+        <span class="whitespace-nowrap">{{ userProfile.name }}</span>
       </div>
     </div>
     <div class="flex flex-1 overflow-hidden">
