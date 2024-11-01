@@ -6,18 +6,17 @@ use std::time::Duration;
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use reqwest::StatusCode;
-use serde_json::json;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, Semaphore};
 use tokio::task::JoinSet;
 
+use crate::bili_client::BiliClient;
 use crate::config::Config;
 use crate::events;
 use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
 use crate::extensions::{AnyhowErrorToStringChain, IgnoreRwLockPoison};
-use crate::responses::{BiliResp, ImageIndexRespData, ImageTokenRespData};
 use crate::types::EpisodeInfo;
 
 /// 用于管理下载任务
@@ -88,8 +87,9 @@ impl DownloadManager {
     async fn process_episode(self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
         emit_pending_event(&self.app, ep_info.episode_id, ep_info.episode_title.clone());
 
-        let image_index_resp_data = self.get_image_index(ep_info.episode_id).await?;
-        let image_token_data_data = self.get_image_token(&image_index_resp_data).await?;
+        let bili_client = self.bili_client();
+        let image_index_resp_data = bili_client.get_image_index(ep_info.episode_id).await?;
+        let image_token_data_data = bili_client.get_image_token(&image_index_resp_data).await?;
 
         let temp_download_dir = get_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
@@ -114,9 +114,9 @@ impl DownloadManager {
         );
         for (i, url) in urls.iter().enumerate() {
             let manager = self.clone();
-            let ep_id = ep_info.episode_id;
-            let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             let url = url.clone();
+            let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
+            let ep_id = ep_info.episode_id;
             let current = current.clone();
             // 创建下载任务
             join_set.spawn(manager.download_image(url, save_path, ep_id, current));
@@ -158,108 +158,6 @@ impl DownloadManager {
             emit_end_event(&self.app, ep_info.episode_id, err_msg);
         };
         Ok(())
-    }
-
-    async fn get_image_index(&self, episode_id: i64) -> anyhow::Result<ImageIndexRespData> {
-        let access_token = self.access_token();
-        let params = json!({
-            "device": "android",
-            "access_key": access_token,
-        });
-        let payload = json!({"epId": episode_id});
-        // 发送获取ImageIndexRespData的请求
-        let http_resp = reqwest::Client::new()
-            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
-            .json(&payload)
-            .query(&params)
-            .send()
-            .await?;
-        // 检查http响应状态码
-        let status = http_resp.status();
-        let body = http_resp.text().await?;
-        if status != StatusCode::OK {
-            return Err(anyhow!(
-            "获取章节 `{episode_id}` 的ImageIndex失败，预料之外的状态码({status}): {body}"
-        ));
-        }
-        // 尝试将body解析为BiliResp
-        let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
-            "获取章节 `{episode_id}` 的ImageIndex失败，将body解析为BiliResp失败: {body}"
-        ))?;
-        // 检查BiliResp的code字段
-        if bili_resp.code != 0 {
-            return Err(anyhow!(
-                "获取章节 `{episode_id}` 的ImageIndex失败，预料之外的code: {bili_resp:?}"
-            ));
-        }
-        // 检查BiliResp的data是否存在
-        let Some(data) = bili_resp.data else {
-            return Err(anyhow!(
-                "获取章节 `{episode_id}` 的ImageIndex失败，data字段不存在: {bili_resp:?}"
-            ));
-        };
-        // 尝试将data解析为ImageIndexRespData
-        let data_str = data.to_string();
-        let image_index_data = serde_json::from_str::<ImageIndexRespData>(&data_str).context(format!(
-            "获取章节 `{episode_id}` 的ImageIndex失败，将data解析为ImageIndexRespData失败: {data_str}"
-        ))?;
-
-        Ok(image_index_data)
-    }
-
-    async fn get_image_token(
-        &self,
-        image_index_data: &ImageIndexRespData,
-    ) -> anyhow::Result<ImageTokenRespData> {
-        let access_token = self.access_token();
-        let params = json!({
-            "mobi_app": "android_comic",
-            "version": "6.5.0",
-            "access_key": access_token,
-        });
-        let urls: Vec<String> = image_index_data
-            .images
-            .iter()
-            .map(|img| img.path.clone())
-            .collect();
-        let urls_str = serde_json::to_string(&urls)?;
-        let payload = json!({"urls": urls_str});
-        // 发送获取ImageToken的请求
-        let http_resp = reqwest::Client::new()
-            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken")
-            .query(&params)
-            .json(&payload)
-            .send()
-            .await?;
-        // 检查http响应状态码
-        let status = http_resp.status();
-        let body = http_resp.text().await?;
-        if status != StatusCode::OK {
-            return Err(anyhow!(
-                "获取ImageToken失败，预料之外的状态码({status}): {body}"
-            ));
-        }
-        // 尝试将body解析为BiliResp
-        let bili_resp = serde_json::from_str::<BiliResp>(&body).context(format!(
-            "获取ImageToken失败，将body解析为BiliResp失败: {body}"
-        ))?;
-        // 检查BiliResp的code字段
-        if bili_resp.code != 0 {
-            let err = anyhow!("获取ImageToken失败，预料之外的code: {bili_resp:?}");
-            return Err(anyhow!(err));
-        }
-        // 检查BiliResp的data是否存在
-        let Some(data) = bili_resp.data else {
-            let err = anyhow!("获取ImageToken失败，data字段不存在: {bili_resp:?}");
-            return Err(anyhow!(err));
-        };
-        // 尝试将data解析为ImageTokenRespData
-        let data_str = data.to_string();
-        let image_token_data = serde_json::from_str::<ImageTokenRespData>(&data_str).context(
-            format!("获取ImageToken失败，将data解析为ImageTokenRespData失败: {data_str}"),
-        )?;
-
-        Ok(image_token_data)
     }
 
     // TODO: 把current变量名改成downloaded_count比较合适
@@ -307,12 +205,8 @@ impl DownloadManager {
         );
     }
 
-    fn access_token(&self) -> String {
-        self.app
-            .state::<RwLock<Config>>()
-            .read_or_panic()
-            .access_token
-            .clone()
+    fn bili_client(&self) -> BiliClient {
+        self.app.state::<BiliClient>().inner().clone()
     }
 }
 
@@ -322,22 +216,6 @@ fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
         .download_dir
         .join(&ep_info.comic_title)
         .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
-}
-
-async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
-    // TODO: 添加重试规则
-    let http_res = reqwest::get(url).await?;
-
-    let status = http_res.status();
-    if status != StatusCode::OK {
-        let text = http_res.text().await?;
-        let err = anyhow!("下载图片 {url} 失败，预料之外的状态码: {text}");
-        return Err(err);
-    }
-
-    let image_data = http_res.bytes().await?;
-
-    Ok(image_data)
 }
 
 fn emit_start_event(app: &AppHandle, ep_id: i64, title: String, total: u32) {
@@ -402,4 +280,20 @@ fn emit_download_speed_event(app: &AppHandle, speed: String) {
     let payload = DownloadSpeedEventPayload { speed };
     let event = DownloadSpeedEvent(payload);
     let _ = event.emit(app);
+}
+
+async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
+    // TODO: 添加重试机制
+    // 发送下载图片请求
+    let http_resp = reqwest::get(url).await?;
+    // 检查http响应状态码
+    let status = http_resp.status();
+    if status != StatusCode::OK {
+        let body = http_resp.text().await?;
+        return Err(anyhow!("下载图片 {url} 失败，预料之外的状态码: {body}"));
+    }
+    // 读取图片数据
+    let image_data = http_resp.bytes().await?;
+
+    Ok(image_data)
 }
