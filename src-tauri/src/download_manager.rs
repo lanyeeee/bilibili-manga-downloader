@@ -17,7 +17,12 @@ use crate::config::Config;
 use crate::events;
 use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
 use crate::extensions::{AnyhowErrorToStringChain, IgnoreRwLockPoison};
-use crate::types::EpisodeInfo;
+use crate::types::{AlbumPlusItem, EpisodeInfo};
+
+enum DownloadPayload {
+    Episode(EpisodeInfo),
+    AlbumPlus(AlbumPlusItem),
+}
 
 /// 用于管理下载任务
 ///
@@ -30,7 +35,7 @@ use crate::types::EpisodeInfo;
 #[derive(Clone)]
 pub struct DownloadManager {
     app: AppHandle,
-    sender: Arc<mpsc::Sender<EpisodeInfo>>,
+    sender: Arc<mpsc::Sender<DownloadPayload>>,
     ep_sem: Arc<Semaphore>,
     img_sem: Arc<Semaphore>,
     byte_per_sec: Arc<AtomicU64>,
@@ -40,7 +45,7 @@ pub struct DownloadManager {
 
 impl DownloadManager {
     pub fn new(app: AppHandle) -> Self {
-        let (sender, receiver) = mpsc::channel::<EpisodeInfo>(32);
+        let (sender, receiver) = mpsc::channel::<DownloadPayload>(32);
         let ep_sem = Arc::new(Semaphore::new(16));
         let img_sem = Arc::new(Semaphore::new(50));
         let manager = DownloadManager {
@@ -60,7 +65,15 @@ impl DownloadManager {
     }
 
     pub async fn submit_episode(&self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
-        Ok(self.sender.send(ep_info).await?)
+        let value = DownloadPayload::Episode(ep_info);
+        self.sender.send(value).await?;
+        Ok(())
+    }
+
+    pub async fn submit_album_plus(&self, item: AlbumPlusItem) -> anyhow::Result<()> {
+        let value = DownloadPayload::AlbumPlus(item);
+        self.sender.send(value).await?;
+        Ok(())
     }
 
     #[allow(clippy::cast_precision_loss)]
@@ -76,22 +89,35 @@ impl DownloadManager {
         }
     }
 
-    async fn receiver_loop(self, mut receiver: Receiver<EpisodeInfo>) {
-        while let Some(ep) = receiver.recv().await {
+    async fn receiver_loop(self, mut receiver: Receiver<DownloadPayload>) {
+        while let Some(payload) = receiver.recv().await {
             let manager = self.clone();
-            tauri::async_runtime::spawn(manager.process_episode(ep));
+            match payload {
+                DownloadPayload::Episode(ep_info) => {
+                    tauri::async_runtime::spawn(manager.process_episode(ep_info));
+                }
+                DownloadPayload::AlbumPlus(item) => {
+                    tauri::async_runtime::spawn(manager.process_album_plus(item));
+                }
+            }
         }
     }
 
+    // TODO: 这里不应该返回错误，否则会被忽略
     #[allow(clippy::cast_possible_truncation)]
     async fn process_episode(self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
         emit_pending_event(&self.app, ep_info.episode_id, ep_info.episode_title.clone());
 
         let bili_client = self.bili_client();
         let image_index_resp_data = bili_client.get_image_index(ep_info.episode_id).await?;
-        let image_token_data_data = bili_client.get_image_token(&image_index_resp_data).await?;
+        let urls: Vec<String> = image_index_resp_data
+            .images
+            .iter()
+            .map(|img| img.path.clone())
+            .collect();
+        let image_token_data_data = bili_client.get_image_token(&urls).await?;
 
-        let temp_download_dir = get_temp_download_dir(&self.app, &ep_info);
+        let temp_download_dir = get_ep_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
             .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
         // 构造图片下载链接
@@ -160,12 +186,88 @@ impl DownloadManager {
         Ok(())
     }
 
+    // TODO: 这里不应该返回错误，否则会被忽略
+    async fn process_album_plus(self, album_plus_item: AlbumPlusItem) -> anyhow::Result<()> {
+        emit_pending_event(&self.app, album_plus_item.id, album_plus_item.title.clone());
+
+        let bili_client = self.bili_client();
+        let image_token_data_data = bili_client.get_image_token(&album_plus_item.pic).await?;
+
+        let temp_download_dir = get_album_plus_temp_download_dir(&self.app, &album_plus_item);
+        std::fs::create_dir_all(&temp_download_dir)
+            .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
+        // 构造图片下载链接
+        let urls: Vec<String> = image_token_data_data
+            .into_iter()
+            .map(|data| data.complete_url)
+            .collect();
+        let total = urls.len() as u32;
+        // 记录总共需要下载的图片数量
+        self.total_image_count.fetch_add(total, Ordering::Relaxed);
+        let current = Arc::new(AtomicU32::new(0));
+        let mut join_set = JoinSet::new();
+        // 限制同时下载的章节数量
+        let permit = self.ep_sem.acquire().await?;
+        emit_start_event(
+            &self.app,
+            album_plus_item.id,
+            album_plus_item.title.clone(),
+            total,
+        );
+        for (i, url) in urls.iter().enumerate() {
+            let manager = self.clone();
+            let url = url.clone();
+            let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
+            let album_plus_id = album_plus_item.id;
+            let current = current.clone();
+            // 创建下载任务
+            join_set.spawn(manager.download_image(url, save_path, album_plus_id, current));
+        }
+        // 逐一处理完成的下载任务
+        while let Some(completed_task) = join_set.join_next().await {
+            completed_task?;
+            self.downloaded_image_count.fetch_add(1, Ordering::Relaxed);
+            let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
+            let total_image_count = self.total_image_count.load(Ordering::Relaxed);
+            // 更新下载进度
+            emit_update_overall_progress_event(
+                &self.app,
+                downloaded_image_count,
+                total_image_count,
+            );
+        }
+        drop(permit);
+        // 如果DownloadManager所有图片全部都已下载(无论成功或失败)，则清空下载进度
+        let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
+        let total_image_count = self.total_image_count.load(Ordering::Relaxed);
+        if downloaded_image_count == total_image_count {
+            self.downloaded_image_count.store(0, Ordering::Relaxed);
+            self.total_image_count.store(0, Ordering::Relaxed);
+        }
+        // 检查此章节的图片是否全部下载成功
+        let current = current.load(Ordering::Relaxed);
+        if current == total {
+            // 下载成功，则把临时目录重命名为正式目录
+            if let Some(parent) = temp_download_dir.parent() {
+                let download_dir = parent.join(&album_plus_item.title);
+                std::fs::rename(&temp_download_dir, &download_dir).context(format!(
+                    "将 {temp_download_dir:?} 重命名为 {download_dir:?} 失败"
+                ))?;
+            }
+            emit_end_event(&self.app, album_plus_item.id, None);
+        } else {
+            let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
+            emit_end_event(&self.app, album_plus_item.id, err_msg);
+        };
+        Ok(())
+    }
+
     // TODO: 把current变量名改成downloaded_count比较合适
     async fn download_image(
         self,
         url: String,
         save_path: PathBuf,
-        ep_id: i64,
+        id: i64,
         current: Arc<AtomicU32>,
     ) {
         // 下载图片
@@ -173,7 +275,7 @@ impl DownloadManager {
             Ok(permit) => permit,
             Err(err) => {
                 let err = err.context("获取下载图片的semaphore失败");
-                emit_error_event(&self.app, ep_id, url, err.to_string_chain());
+                emit_error_event(&self.app, id, url, err.to_string_chain());
                 return;
             }
         };
@@ -181,7 +283,7 @@ impl DownloadManager {
             Ok(data) => data,
             Err(err) => {
                 let err = err.context(format!("下载图片 {url} 失败"));
-                emit_error_event(&self.app, ep_id, url, err.to_string_chain());
+                emit_error_event(&self.app, id, url, err.to_string_chain());
                 return;
             }
         };
@@ -189,7 +291,7 @@ impl DownloadManager {
         // 保存图片
         if let Err(err) = std::fs::write(&save_path, &image_data).map_err(anyhow::Error::from) {
             let err = err.context(format!("保存图片 {save_path:?} 失败"));
-            emit_error_event(&self.app, ep_id, url, err.to_string_chain());
+            emit_error_event(&self.app, id, url, err.to_string_chain());
             return;
         }
         // 记录下载字节数
@@ -199,7 +301,7 @@ impl DownloadManager {
         let current = current.fetch_add(1, Ordering::Relaxed) + 1;
         emit_success_event(
             &self.app,
-            ep_id,
+            id,
             save_path.to_string_lossy().to_string(), // TODO: 把save_path.to_string_lossy().to_string()保存到一个变量里，像current一样
             current,
         );
@@ -210,7 +312,7 @@ impl DownloadManager {
     }
 }
 
-fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
+fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
     app.state::<RwLock<Config>>()
         .read_or_panic()
         .download_dir
@@ -218,45 +320,42 @@ fn get_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
         .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
 }
 
-fn emit_start_event(app: &AppHandle, ep_id: i64, title: String, total: u32) {
-    let payload = events::DownloadEpisodeStartEventPayload {
-        ep_id,
-        title,
-        total,
-    };
-    let event = events::DownloadEpisodeStartEvent(payload);
+fn get_album_plus_temp_download_dir(app: &AppHandle, album_plus_item: &AlbumPlusItem) -> PathBuf {
+    app.state::<RwLock<Config>>()
+        .read_or_panic()
+        .download_dir
+        .join(&album_plus_item.comic_title)
+        .join("特典")
+        .join(format!(".下载中-{}", album_plus_item.title)) // 以 `.下载中-` 开头，表示是临时目录
+}
+
+fn emit_start_event(app: &AppHandle, id: i64, title: String, total: u32) {
+    let payload = events::DownloadStartEventPayload { id, title, total };
+    let event = events::DownloadStartEvent(payload);
     let _ = event.emit(app);
 }
 
-fn emit_pending_event(app: &AppHandle, ep_id: i64, title: String) {
-    let payload = events::DownloadEpisodePendingEventPayload { ep_id, title };
-    let event = events::DownloadEpisodePendingEvent(payload);
+fn emit_pending_event(app: &AppHandle, id: i64, title: String) {
+    let payload = events::DownloadPendingEventPayload { id, title };
+    let event = events::DownloadPendingEvent(payload);
     let _ = event.emit(app);
 }
 
-fn emit_success_event(app: &AppHandle, ep_id: i64, url: String, current: u32) {
-    let payload = events::DownloadImageSuccessEventPayload {
-        ep_id,
-        url,
-        current,
-    };
+fn emit_success_event(app: &AppHandle, id: i64, url: String, current: u32) {
+    let payload = events::DownloadImageSuccessEventPayload { id, url, current };
     let event = events::DownloadImageSuccessEvent(payload);
     let _ = event.emit(app);
 }
 
-fn emit_error_event(app: &AppHandle, ep_id: i64, url: String, err_msg: String) {
-    let payload = events::DownloadImageErrorEventPayload {
-        ep_id,
-        url,
-        err_msg,
-    };
+fn emit_error_event(app: &AppHandle, id: i64, url: String, err_msg: String) {
+    let payload = events::DownloadImageErrorEventPayload { id, url, err_msg };
     let event = events::DownloadImageErrorEvent(payload);
     let _ = event.emit(app);
 }
 
-fn emit_end_event(app: &AppHandle, ep_id: i64, err_msg: Option<String>) {
-    let payload = events::DownloadEpisodeEndEventPayload { ep_id, err_msg };
-    let event = events::DownloadEpisodeEndEvent(payload);
+fn emit_end_event(app: &AppHandle, id: i64, err_msg: Option<String>) {
+    let payload = events::DownloadEndEventPayload { id, err_msg };
+    let event = events::DownloadEndEvent(payload);
     let _ = event.emit(app);
 }
 
