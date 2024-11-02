@@ -31,6 +31,7 @@ pub fn run() {
             get_qrcode_status,
             search,
             get_comic,
+            get_album_plus,
             download_episodes,
             show_path_in_file_manager,
             get_user_profile,

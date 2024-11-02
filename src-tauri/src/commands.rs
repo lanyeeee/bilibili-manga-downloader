@@ -11,7 +11,7 @@ use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{SearchRespData, UserProfileRespData};
-use crate::types::{Comic, EpisodeInfo, QrcodeData, QrcodeStatus};
+use crate::types::{AlbumPlus, Comic, EpisodeInfo, QrcodeData, QrcodeStatus};
 
 #[tauri::command]
 #[specta::specta]
@@ -82,6 +82,16 @@ pub async fn search(
 pub async fn get_comic(bili_client: State<'_, BiliClient>, comic_id: i64) -> CommandResult<Comic> {
     let comic = bili_client.get_comic(comic_id).await?;
     Ok(comic)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn get_album_plus(
+    bili_client: State<'_, BiliClient>,
+    comic_id: i64,
+) -> CommandResult<AlbumPlus> {
+    let album_plus = bili_client.get_album_plus(comic_id).await?;
+    Ok(album_plus)
 }
 
 #[tauri::command(async)]

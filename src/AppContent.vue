@@ -64,7 +64,7 @@ async function showConfigInFileManager() {
 }
 
 async function test() {
-  const result = await commands.getComic(26731);
+  const result = await commands.getAlbumPlus(26731);
   console.log(result);
 }
 
