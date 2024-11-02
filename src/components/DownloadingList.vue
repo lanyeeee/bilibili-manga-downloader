@@ -21,7 +21,7 @@ const progresses = ref<Map<number, ProgressData>>(new Map());
 const overallProgress = ref<ProgressData>({title: "总进度", current: 0, total: 0, percentage: 0, indicator: ""});
 
 onMounted(async () => {
-  await events.downloadEpisodePendingEvent.listen(({payload}) => {
+  await events.downloadPendingEvent.listen(({payload}) => {
     let progressData: ProgressData = {
       title: `等待中 ${payload.title}`,
       current: 0,
@@ -29,11 +29,11 @@ onMounted(async () => {
       percentage: 0,
       indicator: ""
     };
-    progresses.value.set(payload.epId, progressData);
+    progresses.value.set(payload.id, progressData);
   });
 
-  await events.downloadEpisodeStartEvent.listen(({payload}) => {
-    const progressData = progresses.value.get(payload.epId) as (ProgressData | undefined);
+  await events.downloadStartEvent.listen(({payload}) => {
+    const progressData = progresses.value.get(payload.id) as (ProgressData | undefined);
     if (progressData === undefined) {
       return;
     }
@@ -42,7 +42,7 @@ onMounted(async () => {
   });
 
   await events.downloadImageSuccessEvent.listen(({payload}) => {
-    const progressData = progresses.value.get(payload.epId) as (ProgressData | undefined);
+    const progressData = progresses.value.get(payload.id) as (ProgressData | undefined);
     if (progressData === undefined) {
       return;
     }
@@ -51,7 +51,7 @@ onMounted(async () => {
   });
 
   await events.downloadImageErrorEvent.listen(({payload}) => {
-    const progressData = progresses.value.get(payload.epId) as (ProgressData | undefined);
+    const progressData = progresses.value.get(payload.id) as (ProgressData | undefined);
     if (progressData === undefined) {
       return;
     }
@@ -63,15 +63,15 @@ onMounted(async () => {
     });
   });
 
-  await events.downloadEpisodeEndEvent.listen(({payload}) => {
-    const progressData = progresses.value.get(payload.epId) as (ProgressData | undefined);
+  await events.downloadEndEvent.listen(({payload}) => {
+    const progressData = progresses.value.get(payload.id) as (ProgressData | undefined);
     if (progressData === undefined) {
       return;
     }
     if (payload.errMsg !== null) {
       notification.warning({title: "下载章节失败", content: payload.errMsg, meta: progressData.title});
     }
-    progresses.value.delete(payload.epId);
+    progresses.value.delete(payload.id);
   });
 
   await events.updateOverallDownloadProgressEvent.listen(({payload}) => {

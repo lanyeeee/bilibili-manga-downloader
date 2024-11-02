@@ -5,6 +5,7 @@ mod comic_resp_data;
 mod qrcode_status_resp_data;
 mod search_resp_data;
 mod user_profile_resp_data;
+mod album_plus_resp_data;
 
 pub use generate_qrcode_resp_data::*;
 pub use image_index_resp_data::*;
@@ -13,6 +14,7 @@ pub use comic_resp_data::*;
 pub use qrcode_status_resp_data::*;
 pub use search_resp_data::*;
 pub use user_profile_resp_data::*;
+pub use album_plus_resp_data::*;
 
 use serde::{Deserialize, Serialize};
 

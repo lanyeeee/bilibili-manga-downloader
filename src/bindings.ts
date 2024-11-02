@@ -51,9 +51,25 @@ async getComic(comicId: number) : Promise<Result<Comic, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getAlbumPlus(comicId: number) : Promise<Result<AlbumPlus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_album_plus", { comicId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async downloadEpisodes(episodes: EpisodeInfo[]) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("download_episodes", { episodes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async downloadAlbumPlusItems(items: AlbumPlusItem[]) : Promise<Result<null, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_album_plus_items", { items }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -81,24 +97,24 @@ async getUserProfile() : Promise<Result<UserProfileRespData, CommandError>> {
 
 
 export const events = __makeEvents__<{
-downloadEpisodeEndEvent: DownloadEpisodeEndEvent,
-downloadEpisodePendingEvent: DownloadEpisodePendingEvent,
-downloadEpisodeStartEvent: DownloadEpisodeStartEvent,
+downloadEndEvent: DownloadEndEvent,
 downloadImageErrorEvent: DownloadImageErrorEvent,
 downloadImageSuccessEvent: DownloadImageSuccessEvent,
+downloadPendingEvent: DownloadPendingEvent,
 downloadSpeedEvent: DownloadSpeedEvent,
+downloadStartEvent: DownloadStartEvent,
 removeWatermarkEndEvent: RemoveWatermarkEndEvent,
 removeWatermarkErrorEvent: RemoveWatermarkErrorEvent,
 removeWatermarkStartEvent: RemoveWatermarkStartEvent,
 removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent,
 updateOverallDownloadProgressEvent: UpdateOverallDownloadProgressEvent
 }>({
-downloadEpisodeEndEvent: "download-episode-end-event",
-downloadEpisodePendingEvent: "download-episode-pending-event",
-downloadEpisodeStartEvent: "download-episode-start-event",
+downloadEndEvent: "download-end-event",
 downloadImageErrorEvent: "download-image-error-event",
 downloadImageSuccessEvent: "download-image-success-event",
+downloadPendingEvent: "download-pending-event",
 downloadSpeedEvent: "download-speed-event",
+downloadStartEvent: "download-start-event",
 removeWatermarkEndEvent: "remove-watermark-end-event",
 removeWatermarkErrorEvent: "remove-watermark-error-event",
 removeWatermarkStartEvent: "remove-watermark-start-event",
@@ -112,29 +128,32 @@ updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
 
 /** user-defined types **/
 
+export type AlbumPlus = { list: AlbumPlusDetail[]; icon_url: string; comic_title: string; server_time: string }
+export type AlbumPlusDetail = { isLock: boolean; isDownloaded: boolean; cost: number; reward: number; item: AlbumPlusItem; unlocked_item_ids: number[] }
+export type AlbumPlusItem = { id: number; title: string; comicTitle: string; pic: string[] }
 export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
 export type AutoPayOrder = { id: number; title: string }
 export type BannerRespData = { icon: string; title: string; url: string }
-export type Comic = { id: number; title: string; comic_type: number; page_default: number; page_allow: number; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; last_ord: number; is_finish: number; status: number; fav: number; read_order: number; evaluate: string; total: number; episodeInfos: EpisodeInfo[]; release_time: string; is_limit: number; read_epid: number; last_read_time: string; is_download: number; read_short_title: string; styles2: Styles2[]; renewal_time: string; last_short_title: string; discount_type: number; discount: number; discount_end: string; no_reward: boolean; batch_discount_type: number; ep_discount_type: number; has_fav_activity: boolean; fav_free_amount: number; allow_wait_free: boolean; wait_hour: number; wait_free_at: string; no_danmaku: number; auto_pay_status: number; no_month_ticket: boolean; immersive: boolean; no_discount: boolean; show_type: number; pay_mode: number; classic_lines: string; pay_for_new: number; fav_comic_info: FavComicInfo; serial_status: number; album_count: number; wiki_id: number; disable_coupon_amount: number; japan_comic: boolean; interact_value: string; temporary_finish_time: string; introduction: string; comment_status: number; no_screenshot: boolean; type: number; no_rank: boolean; presale_text: string; presale_discount: number; no_leaderboard: boolean; auto_pay_info: AutoPayInfo; orientation: number; story_elems: StoryElem[]; tags: Tag[]; is_star_hall: number; hall_icon_text: string; rookie_fav_tip: RookieFavTip; authors: Author[]; comic_alias: string[]; horizontal_covers: string[]; data_info: DataInfo; last_short_title_msg: string }
+export type Comic = { id: number; title: string; comic_type: number; page_default: number; page_allow: number; horizontal_cover: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; last_ord: number; is_finish: number; status: number; fav: number; read_order: number; evaluate: string; total: number; episodeInfos: EpisodeInfo[]; release_time: string; is_limit: number; read_epid: number; last_read_time: string; is_download: number; read_short_title: string; styles2: Styles2[]; renewal_time: string; last_short_title: string; discount_type: number; discount: number; discount_end: string; no_reward: boolean; batch_discount_type: number; ep_discount_type: number; has_fav_activity: boolean; fav_free_amount: number; allow_wait_free: boolean; wait_hour: number; wait_free_at: string; no_danmaku: number; auto_pay_status: number; no_month_ticket: boolean; immersive: boolean; no_discount: boolean; show_type: number; pay_mode: number; classic_lines: string; pay_for_new: number; fav_comic_info: FavComicInfo; serial_status: number; album_count: number; wiki_id: number; disable_coupon_amount: number; japan_comic: boolean; interact_value: string; temporary_finish_time: string; introduction: string; comment_status: number; no_screenshot: boolean; type: number; no_rank: boolean; presale_text: string; presale_discount: number; no_leaderboard: boolean; auto_pay_info: AutoPayInfo; orientation: number; story_elems: StoryElem[]; tags: Tag[]; is_star_hall: number; hall_icon_text: string; rookie_fav_tip: RookieFavTip; authors: Author[]; comic_alias: string[]; horizontal_covers: string[]; data_info: DataInfo; last_short_title_msg: string; albumPlus: AlbumPlus }
 export type ComicInSearchRespData = { id: number; title: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData }
 export type CommandError = string
 export type Config = { accessToken: string; downloadDir: string }
 export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
 export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
 export type DataInfo = { read_score: ReadScore; interactive_value: InteractiveValue }
-export type DownloadEpisodeEndEvent = DownloadEpisodeEndEventPayload
-export type DownloadEpisodeEndEventPayload = { epId: number; errMsg: string | null }
-export type DownloadEpisodePendingEvent = DownloadEpisodePendingEventPayload
-export type DownloadEpisodePendingEventPayload = { epId: number; title: string }
-export type DownloadEpisodeStartEvent = DownloadEpisodeStartEventPayload
-export type DownloadEpisodeStartEventPayload = { epId: number; title: string; total: number }
+export type DownloadEndEvent = DownloadEndEventPayload
+export type DownloadEndEventPayload = { id: number; errMsg: string | null }
 export type DownloadImageErrorEvent = DownloadImageErrorEventPayload
-export type DownloadImageErrorEventPayload = { epId: number; url: string; errMsg: string }
+export type DownloadImageErrorEventPayload = { id: number; url: string; errMsg: string }
 export type DownloadImageSuccessEvent = DownloadImageSuccessEventPayload
-export type DownloadImageSuccessEventPayload = { epId: number; url: string; current: number }
+export type DownloadImageSuccessEventPayload = { id: number; url: string; current: number }
+export type DownloadPendingEvent = DownloadPendingEventPayload
+export type DownloadPendingEventPayload = { id: number; title: string }
 export type DownloadSpeedEvent = DownloadSpeedEventPayload
 export type DownloadSpeedEventPayload = { speed: string }
+export type DownloadStartEvent = DownloadStartEventPayload
+export type DownloadStartEventPayload = { id: number; title: string; total: number }
 export type EpisodeInfo = { episodeId: number; episodeTitle: string; comicId: number; comicTitle: string; isLocked: boolean; isDownloaded: boolean }
 export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number; fav_coupon_type: number }
 export type Increase = { days: number; increase_percent: number }
