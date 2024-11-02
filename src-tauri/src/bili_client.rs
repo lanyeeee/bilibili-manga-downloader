@@ -260,7 +260,9 @@ impl BiliClient {
         let comic_resp_data = serde_json::from_str::<ComicRespData>(&data_str).context(format!(
             "获取漫画详情失败，将data解析为ComicRespData失败: {data_str}"
         ))?;
-        let comic = Comic::from_comic_resp_data(&self.app, comic_resp_data);
+        // TODO: 获取comic_resp_data与album_plus可以并行
+        let album_plus = self.get_album_plus(comic_id).await?;
+        let comic = Comic::from(&self.app, comic_resp_data, album_plus);
 
         Ok(comic)
     }
@@ -302,7 +304,7 @@ impl BiliClient {
             .context(format!(
                 "获取特典失败，将data解析为AlbumPlusRespData失败: {data_str}"
             ))?;
-        let comic_album_plus = AlbumPlus::from_resp_data(&self.app, comic_album_plus_resp_data);
+        let comic_album_plus = AlbumPlus::from(&self.app, comic_album_plus_resp_data);
 
         Ok(comic_album_plus)
     }

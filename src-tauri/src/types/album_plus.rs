@@ -21,7 +21,7 @@ pub struct AlbumPlus {
     pub server_time: String,
 }
 impl AlbumPlus {
-    pub fn from_resp_data(app: &AppHandle, resp_data: AlbumPlusRespData) -> Self {
+    pub fn from(app: &AppHandle, resp_data: AlbumPlusRespData) -> Self {
         let comic_title = filename_filter(&resp_data.comic_title);
         let list = resp_data
             .list
