@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {SelectionArea, SelectionEvent, SelectionOptions} from "@viselect/vue";
 import {nextTick, ref, watch} from "vue";
-import {commands, Comic} from "../bindings.ts";
+import {Comic, commands} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 
 const notification = useNotification();
@@ -32,11 +32,17 @@ function extractIds(elements: Element[]): number[] {
       .filter(Boolean)
       .map(Number)
       .filter(id => {
-        const ep = selectedComic.value?.episodeInfos.find(ep => ep.episodeId === id);
-        if (ep === undefined) {
-          return false;
+        const episodeInfo = selectedComic.value?.episodeInfos.find(ep => ep.episodeId === id);
+        if (episodeInfo !== undefined) {
+          return !episodeInfo.isLocked && !episodeInfo.isDownloaded;
         }
-        return !ep.isLocked && !ep.isDownloaded;
+
+        const albumPlusDetail = selectedComic.value?.albumPlus.list.find(detail => detail.item.id === id);
+        if (albumPlusDetail !== undefined) {
+          return !albumPlusDetail.isLock && !albumPlusDetail.isDownloaded;
+        }
+
+        return false;
       });
 }
 
@@ -66,6 +72,10 @@ function onDropdownSelect(key: "check" | "uncheck" | "check all" | "uncheck all"
     selectedComic.value?.episodeInfos
         .filter(ep => !ep.isLocked && !ep.isDownloaded && !checkedIds.value.includes(ep.episodeId))
         .forEach(ep => checkedIds.value.push(ep.episodeId));
+
+    selectedComic.value?.albumPlus.list
+        .filter(detail => !detail.isLock && !detail.isDownloaded && !checkedIds.value.includes(detail.item.id))
+        .forEach(detail => checkedIds.value.push(detail.item.id));
   } else if (key === "uncheck all") {
     checkedIds.value.length = 0;
   }
@@ -79,24 +89,43 @@ async function onContextMenu(e: MouseEvent) {
   dropdownY.value = e.clientY;
 }
 
-async function downloadEpisodes() {
-  const episodesToDownload = selectedComic.value?.episodeInfos.filter(ep => !ep.isDownloaded && checkedIds.value.includes(ep.episodeId));
-  if (episodesToDownload === undefined) {
-    return;
-  }
-  const result = await commands.downloadEpisodes(episodesToDownload);
-  if (result.status === "error") {
-    console.error(result.error);
-    return;
-  }
+async function downloadChecked() {
+  const episodesToDownload = selectedComic.value?.episodeInfos
+      .filter(ep => !ep.isDownloaded && checkedIds.value.includes(ep.episodeId));
+  if (episodesToDownload !== undefined) {
+    const result = await commands.downloadEpisodes(episodesToDownload);
+    if (result.status === "error") {
+      notification.error({title: "下载章节失败", description: result.error});
+    }
 
-  for (const downloadedEp of episodesToDownload) {
-    const episode = selectedComic.value?.episodeInfos.find(ep => ep.episodeId === downloadedEp.episodeId);
-    if (episode !== undefined) {
-      episode.isDownloaded = true;
-      checkedIds.value = checkedIds.value.filter(id => id !== downloadedEp.episodeId);
+    for (const downloadedEp of episodesToDownload) {
+      const episode = selectedComic.value?.episodeInfos.find(ep => ep.episodeId === downloadedEp.episodeId);
+      if (episode !== undefined) {
+        episode.isDownloaded = true;
+        checkedIds.value = checkedIds.value.filter(id => id !== downloadedEp.episodeId);
+      }
     }
   }
+
+  const albumPlusItemToDownload = selectedComic.value?.albumPlus.list
+      .filter(detail => !detail.isDownloaded && checkedIds.value.includes(detail.item.id))
+      .map(detail => detail.item);
+  if (albumPlusItemToDownload !== undefined) {
+    const result = await commands.downloadAlbumPlusItems(albumPlusItemToDownload);
+    if (result.status === "error") {
+      notification.error({title: "下载特典失败", description: result.error});
+    }
+
+    for (const downloadedItem of albumPlusItemToDownload) {
+      const detail = selectedComic.value?.albumPlus.list.find(detail => detail.item.id === downloadedItem.id);
+      if (detail !== undefined) {
+        detail.isDownloaded = true;
+        checkedIds.value = checkedIds.value.filter(id => id !== downloadedItem.id);
+      }
+    }
+  }
+
+
 }
 
 async function refreshEpisodes() {
@@ -127,9 +156,9 @@ async function refreshEpisodes() {
     <div class="flex justify-between">
       左键拖动进行框选，右键打开菜单
       <n-button size="tiny" :disabled="selectedComic===undefined" @click="refreshEpisodes" class="w-1/6">刷新</n-button>
-      <n-button size="tiny" :disabled="selectedComic===undefined" type="primary" @click="downloadEpisodes"
+      <n-button size="tiny" :disabled="selectedComic===undefined" type="primary" @click="downloadChecked"
                 class="w-1/4">
-        下载勾选章节
+        下载勾选项
       </n-button>
     </div>
     <n-empty v-if="selectedComic===undefined" description="请先进行漫画搜索">
@@ -141,15 +170,30 @@ async function refreshEpisodes() {
                    @contextmenu="onContextMenu"
                    @move="onDragMove"
                    @start="onDragStart">
-      <n-checkbox-group v-model:value="checkedIds" class="grid grid-cols-3 gap-1.5 w-full">
-        <n-checkbox v-for="{episodeId, episodeTitle, isLocked, isDownloaded} in selectedComic.episodeInfos"
-                    :key="episodeId"
-                    :data-key="episodeId"
-                    class="selectable hover:bg-gray-200!"
-                    :value="episodeId"
-                    :label="episodeTitle"
-                    :disabled="isLocked || isDownloaded"
-                    :class="{ selected: selectedIds.has(episodeId), downloaded: isDownloaded }"/>
+      <n-checkbox-group v-model:value="checkedIds" class="h-full flex flex-col">
+        <div class="grid grid-cols-3 gap-1.5 w-full overflow-auto">
+          <n-checkbox v-for="{episodeId, episodeTitle, isLocked, isDownloaded} in selectedComic.episodeInfos"
+                      :key="episodeId"
+                      :data-key="episodeId"
+                      class="selectable hover:bg-gray-200!"
+                      :value="episodeId"
+                      :label="episodeTitle"
+                      :disabled="isLocked || isDownloaded"
+                      :class="{ selected: selectedIds.has(episodeId), downloaded: isDownloaded }"/>
+        </div>
+        <n-divider class="my-1!" title-placement="left">
+          特典
+        </n-divider>
+        <div class="grid grid-cols-3 gap-1.5 w-full pb-3">
+          <n-checkbox v-for="{isLock, isDownloaded, item} in selectedComic.albumPlus.list"
+                      :key="item.id"
+                      :data-key="item.id"
+                      class="selectable hover:bg-gray-200!"
+                      :value="item.id"
+                      :label="item.title"
+                      :disabled="isLock || isDownloaded"
+                      :class="{ selected: selectedIds.has(item.id), downloaded: isDownloaded }"/>
+        </div>
       </n-checkbox-group>
     </SelectionArea>
 

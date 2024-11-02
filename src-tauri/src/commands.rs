@@ -11,7 +11,7 @@ use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{SearchRespData, UserProfileRespData};
-use crate::types::{AlbumPlus, Comic, EpisodeInfo, QrcodeData, QrcodeStatus};
+use crate::types::{AlbumPlus, AlbumPlusItem, Comic, EpisodeInfo, QrcodeData, QrcodeStatus};
 
 #[tauri::command]
 #[specta::specta]
@@ -102,6 +102,18 @@ pub async fn download_episodes(
 ) -> CommandResult<()> {
     for ep in episodes {
         download_manager.submit_episode(ep).await?;
+    }
+    Ok(())
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn download_album_plus_items(
+    download_manager: State<'_, DownloadManager>,
+    items: Vec<AlbumPlusItem>,
+) -> CommandResult<()> {
+    for item in items {
+        download_manager.submit_album_plus(item).await?;
     }
     Ok(())
 }

@@ -356,22 +356,14 @@ impl BiliClient {
         Ok(image_index_data)
     }
 
-    pub async fn get_image_token(
-        &self,
-        image_index_data: &ImageIndexRespData,
-    ) -> anyhow::Result<ImageTokenRespData> {
+    pub async fn get_image_token(&self, urls: &Vec<String>) -> anyhow::Result<ImageTokenRespData> {
         let access_token = self.access_token();
         let params = json!({
             "mobi_app": "android_comic",
             "version": "6.5.0",
             "access_key": access_token,
         });
-        let urls: Vec<String> = image_index_data
-            .images
-            .iter()
-            .map(|img| img.path.clone())
-            .collect();
-        let urls_str = serde_json::to_string(&urls)?;
+        let urls_str = serde_json::to_string(urls)?;
         let payload = json!({"urls": urls_str});
         // 发送获取ImageToken的请求
         let http_resp = Self::client()
