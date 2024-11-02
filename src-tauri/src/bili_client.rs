@@ -16,10 +16,10 @@ use url::form_urlencoded;
 use crate::config::Config;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
-    BiliResp, ComicRespData, GenerateQrcodeRespData, ImageIndexRespData, ImageTokenRespData,
-    QrcodeStatusRespData, SearchRespData, UserProfileRespData,
+    AlbumPlusRespData, BiliResp, ComicRespData, GenerateQrcodeRespData, ImageIndexRespData,
+    ImageTokenRespData, QrcodeStatusRespData, SearchRespData, UserProfileRespData,
 };
-use crate::types::{Comic, QrcodeData, QrcodeStatus};
+use crate::types::{AlbumPlus, Comic, QrcodeData, QrcodeStatus};
 
 const APP_KEY: &str = "cc8617fd6961e070";
 const APP_SEC: &str = "3131924b941aac971e45189f265262be";
@@ -263,6 +263,48 @@ impl BiliClient {
         let comic = Comic::from_comic_resp_data(&self.app, comic_resp_data);
 
         Ok(comic)
+    }
+
+    pub async fn get_album_plus(&self, comic_id: i64) -> anyhow::Result<AlbumPlus> {
+        let access_token = self.access_token();
+        let params = json!({
+            "version": "6.5.0",
+            "access_key": access_token,
+        });
+        let payload = json!({"comic_id": comic_id});
+        // 发送获取特典请求
+        let http_res = Self::client()
+            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetComicAlbumPlus")
+            .query(&params)
+            .json(&payload)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_res.status();
+        let body = http_res.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!("获取特典失败，预料之外的状态码({status}): {body}"));
+        }
+        // 尝试将body解析为BiliResp
+        let bili_resp = serde_json::from_str::<BiliResp>(&body)
+            .context(format!("获取特典失败，将body解析为BiliResp失败: {body}"))?;
+        // 检查BiliResp的code字段
+        if bili_resp.code != 0 {
+            return Err(anyhow!("获取特典失败，预料之外的code: {bili_resp:?}"));
+        }
+        // 检查BiliResp的data是否存在
+        let Some(data) = bili_resp.data else {
+            return Err(anyhow!("获取特典失败，data字段不存在: {bili_resp:?}"));
+        };
+        // 尝试将data解析为AlbumPlusRespData
+        let data_str = data.to_string();
+        let comic_album_plus_resp_data = serde_json::from_str::<AlbumPlusRespData>(&data_str)
+            .context(format!(
+                "获取特典失败，将data解析为AlbumPlusRespData失败: {data_str}"
+            ))?;
+        let comic_album_plus = AlbumPlus::from_resp_data(&self.app, comic_album_plus_resp_data);
+
+        Ok(comic_album_plus)
     }
 
     pub async fn get_image_index(&self, episode_id: i64) -> anyhow::Result<ImageIndexRespData> {

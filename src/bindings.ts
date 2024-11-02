@@ -51,6 +51,14 @@ async getComic(comicId: number) : Promise<Result<Comic, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
+async getAlbumPlus(comicId: number) : Promise<Result<AlbumPlus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_album_plus", { comicId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async downloadEpisodes(episodes: EpisodeInfo[]) : Promise<Result<null, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("download_episodes", { episodes }) };
@@ -112,6 +120,9 @@ updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
 
 /** user-defined types **/
 
+export type AlbumPlus = { list: AlbumPlusDetail[]; icon_url: string; comic_title: string; server_time: string }
+export type AlbumPlusDetail = { isLock: boolean; isDownloaded: boolean; cost: number; reward: number; item: AlbumPlusItem; unlocked_item_ids: number[] }
+export type AlbumPlusItem = { id: number; title: string; cover: string; pic: string[]; rank: number; detail: string; limits: number; pic_type: number; pic_num: number; online_time: string; offline_time: string; num: number; type: number; icon: string; activity_url: string; activity_name: string; item_ids: number[]; no_local: boolean; video: Video | null; item_infos: ItemInfo[] }
 export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
 export type AutoPayOrder = { id: number; title: string }
@@ -139,6 +150,7 @@ export type EpisodeInfo = { episodeId: number; episodeTitle: string; comicId: nu
 export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number; fav_coupon_type: number }
 export type Increase = { days: number; increase_percent: number }
 export type InteractiveValue = { interact_value: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
+export type ItemInfo = { id: number; title: string }
 export type NovelInSearchRespData = { novel_id: number; title: string; v_cover: string; finish_status: number; status: number; discount_type: number; numbers: number; style: StyleRespData; evaluate: string; author: string; tag: TagRespData }
 export type QrcodeData = { base64: string; auth_code: string }
 export type QrcodeStatus = { code: number; message: string; is_new: boolean; mid: number; access_token: string; refresh_token: string; expires_in: number; token_info: TokenInfoRespData; cookie_info: CookieInfoRespData; sso: string[] }
@@ -164,6 +176,7 @@ export type TokenInfoRespData = { mid: number; access_token: string; refresh_tok
 export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
 export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
 export type UserProfileRespData = { face: string; name: string }
+export type Video = { id: number; url: string; cover: string; duration: string }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/
