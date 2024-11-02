@@ -30,7 +30,7 @@ pub struct ComicRespData {
     pub status: i64,
     pub fav: i64,
     #[serde(rename = "read_order")]
-    pub read_order: i64,
+    pub read_order: f64,
     pub evaluate: String,
     pub total: i64,
     #[serde(rename = "ep_list")]
