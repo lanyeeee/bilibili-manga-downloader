@@ -277,6 +277,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "bytes",
+ "chrono",
  "image",
  "md5",
  "path-slash",
@@ -294,6 +295,7 @@ dependencies = [
  "tauri-specta",
  "tokio",
  "url",
+ "yaserde",
 ]
 
 [[package]]
@@ -525,8 +527,10 @@ checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -3108,9 +3112,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "reqwest"
-version = "0.12.8"
+version = "0.12.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f713147fbe92361e52392c73b8c9e48c04c6625bce969ef54dc901e58e042a7b"
+checksum = "a77c62af46e79de0a562e1a9849205ffcb7fc1238876e9bd743357570e04046f"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -5403,6 +5407,37 @@ checksum = "ec1cdab258fb55c0da61328dc52c8764709b249011b2cad0454c72f0bf10a1f6"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "xml-rs"
+version = "0.8.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af4e2e2f7cba5a093896c1e150fbfe177d1883e7448200efb81d40b9d339ef26"
+
+[[package]]
+name = "yaserde"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3837963ac213fd0babf6be78811f1d9e673e5c9240ee0d00020fa69c0acb5b35"
+dependencies = [
+ "log",
+ "xml-rs",
+ "yaserde_derive",
+]
+
+[[package]]
+name = "yaserde_derive"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b14b171e65b944cd8018ea60ac5cc6601bb0a07ce4b2979962e22c9f6fb6496"
+dependencies = [
+ "heck 0.5.0",
+ "log",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+ "xml-rs",
 ]
 
 [[package]]
