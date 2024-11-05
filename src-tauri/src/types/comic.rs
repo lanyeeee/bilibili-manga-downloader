@@ -1,8 +1,10 @@
 use std::sync::RwLock;
 
+use chrono::{Datelike, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
+use yaserde::{YaDeserialize, YaSerialize};
 
 use crate::config::Config;
 use crate::extensions::IgnoreRwLockPoison;
@@ -153,6 +155,7 @@ pub struct Comic {
     pub album_plus: AlbumPlus,
 }
 impl Comic {
+    // TODO: 将resp_data重命名为comic
     pub fn from(app: &AppHandle, resp_data: ComicRespData, album_plus: AlbumPlus) -> Self {
         let comic_title = filename_filter(&resp_data.title);
         let mut episode_infos: Vec<EpisodeInfo> = resp_data
@@ -164,6 +167,8 @@ impl Comic {
                 let comic_title = comic_title.clone();
                 let is_downloaded =
                     Self::get_is_downloaded(app, &episode_title, &comic_title).ok()?;
+                const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+                let pub_time = NaiveDateTime::parse_from_str(&ep.pub_time, TIME_FORMAT).ok()?;
                 let episode_info = EpisodeInfo {
                     episode_id,
                     episode_title,
@@ -171,6 +176,26 @@ impl Comic {
                     comic_title,
                     is_locked: ep.is_locked,
                     is_downloaded,
+                    comic_info: ComicInfo {
+                        manga: "Yes".to_string(),
+                        series: resp_data.title.clone(),
+                        publisher: "哔哩哔哩漫画".to_string(),
+                        writer: resp_data
+                            .authors
+                            .iter()
+                            .map(|a| a.name.as_str())
+                            .collect::<Vec<&str>>()
+                            .join(", "),
+                        genre: resp_data.styles.join(", "),
+                        summary: resp_data.evaluate.clone(),
+                        count: resp_data.total,
+                        title: ep.title,
+                        number: ep.ord.to_string(),
+                        page_count: ep.image_count,
+                        year: pub_time.year(),
+                        month: pub_time.month(),
+                        day: pub_time.day(),
+                    },
                 };
                 Some(episode_info)
             })
@@ -355,6 +380,7 @@ impl Comic {
         };
         ep_title.trim().to_string()
     }
+    // TODO: 去掉anyhow::Result
     fn get_is_downloaded(
         app: &AppHandle,
         ep_title: &str,
@@ -380,6 +406,40 @@ pub struct EpisodeInfo {
     pub comic_title: String,
     pub is_locked: bool,
     pub is_downloaded: bool,
+    pub comic_info: ComicInfo,
+}
+
+#[derive(
+    Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type, YaSerialize, YaDeserialize,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct ComicInfo {
+    #[yaserde(rename = "Manga")]
+    pub manga: String,
+    #[yaserde(rename = "Series")]
+    pub series: String,
+    #[yaserde(rename = "Publisher")]
+    pub publisher: String,
+    #[yaserde(rename = "Writer")]
+    pub writer: String,
+    #[yaserde(rename = "Genre")]
+    pub genre: String,
+    #[yaserde(rename = "Summary")]
+    pub summary: String,
+    #[yaserde(rename = "Count")]
+    pub count: i64,
+    #[yaserde(rename = "Title")]
+    pub title: String,
+    #[yaserde(rename = "Number")]
+    pub number: String,
+    #[yaserde(rename = "PageCount")]
+    pub page_count: i64,
+    #[yaserde(rename = "Year")]
+    pub year: i32,
+    #[yaserde(rename = "Month")]
+    pub month: u32,
+    #[yaserde(rename = "Day")]
+    pub day: u32,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
