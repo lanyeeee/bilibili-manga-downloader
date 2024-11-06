@@ -1,16 +1,16 @@
 use std::sync::RwLock;
 
-use chrono::{Datelike, NaiveDateTime};
-use serde::{Deserialize, Serialize};
-use specta::Type;
-use tauri::{AppHandle, Manager};
-use yaserde::{YaDeserialize, YaSerialize};
-
 use crate::config::Config;
 use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{ComicRespData, EpisodeRespData};
 use crate::types::AlbumPlus;
 use crate::utils::filename_filter;
+
+use chrono::{Datelike, NaiveDateTime};
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri::{AppHandle, Manager};
+use yaserde::{YaDeserialize, YaSerialize};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -165,8 +165,7 @@ impl Comic {
                 let episode_id = ep.id;
                 let episode_title = Self::get_episode_title(&ep);
                 let comic_title = comic_title.clone();
-                let is_downloaded =
-                    Self::get_is_downloaded(app, &episode_title, &comic_title).ok()?;
+                let is_downloaded = Self::get_is_downloaded(app, &episode_title, &comic_title);
                 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
                 let pub_time = NaiveDateTime::parse_from_str(&ep.pub_time, TIME_FORMAT).ok()?;
                 // TODO: 把构造EpisodeInfo的逻辑提取到一个函数中
@@ -381,20 +380,15 @@ impl Comic {
         };
         ep_title.trim().to_string()
     }
-    // TODO: 去掉anyhow::Result
-    fn get_is_downloaded(
-        app: &AppHandle,
-        ep_title: &str,
-        comic_title: &str,
-    ) -> anyhow::Result<bool> {
-        let download_dir = app
-            .state::<RwLock<Config>>()
-            .read_or_panic()
+    fn get_is_downloaded(app: &AppHandle, ep_title: &str, comic_title: &str) -> bool {
+        let config = app.state::<RwLock<Config>>();
+        let config = config.read_or_panic();
+        config
             .download_dir
             .join(comic_title)
-            .join(ep_title);
-        let is_downloaded = download_dir.exists();
-        Ok(is_downloaded)
+            .join(ep_title)
+            .with_extension(config.archive_format.extension())
+            .exists()
     }
 }
 
