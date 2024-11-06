@@ -118,6 +118,12 @@ async function selectDownloadDir() {
       </n-input>
       <n-button size="tiny" @click="showDownloadDirInFileManager">打开下载目录</n-button>
     </div>
+    <n-radio-group v-model:value="config.archiveFormat">
+      下载格式：
+      <n-radio value="Image">文件夹-图片</n-radio>
+      <n-radio value="Zip">zip</n-radio>
+      <n-radio value="Cbz">cbz</n-radio>
+    </n-radio-group>
     <div class="grid grid-cols-[1fr_4fr_2fr]">
       <span class="text-ellipsis whitespace-nowrap overflow-hidden">{{ overallProgress.title }}</span>
       <n-progress :percentage="overallProgress.percentage" indicator-placement="inside" :height="21">

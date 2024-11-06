@@ -1,7 +1,15 @@
+use std::fs::File;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+
+use crate::bili_client::BiliClient;
+use crate::config::Config;
+use crate::events;
+use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
+use crate::extensions::{AnyhowErrorToStringChain, IgnoreRwLockPoison};
+use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
@@ -11,14 +19,10 @@ use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, Semaphore};
 use tokio::task::JoinSet;
+use zip::write::SimpleFileOptions;
+use zip::ZipWriter;
 
-use crate::bili_client::BiliClient;
-use crate::config::Config;
-use crate::events;
-use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
-use crate::extensions::{AnyhowErrorToStringChain, IgnoreRwLockPoison};
-use crate::types::{AlbumPlusItem, EpisodeInfo};
-
+// TODO: EpisodeInfo与AlbumPlusItem的内存差距过大，应该用Box包裹EpisodeInfo
 enum DownloadPayload {
     Episode(EpisodeInfo),
     AlbumPlus(AlbumPlusItem),
@@ -170,19 +174,94 @@ impl DownloadManager {
         }
         // 检查此章节的图片是否全部下载成功
         let current = current.load(Ordering::Relaxed);
-        if current == total {
-            // 下载成功，则把临时目录重命名为正式目录
-            if let Some(parent) = temp_download_dir.parent() {
-                let download_dir = parent.join(&ep_info.episode_title);
-                std::fs::rename(&temp_download_dir, &download_dir).context(format!(
+        // 此章节的图片未全部下载成功
+        if current != total {
+            let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
+            emit_end_event(&self.app, ep_info.episode_id, err_msg);
+            return Ok(());
+        }
+        // 此章节的图片全部下载成功
+        let err_msg = match self.save_archive(&ep_info, &temp_download_dir) {
+            Ok(_) => None,
+            Err(err) => Some(err.to_string_chain()),
+        };
+        emit_end_event(&self.app, ep_info.episode_id, err_msg);
+        Ok(())
+    }
+
+    fn save_archive(
+        &self,
+        ep_info: &EpisodeInfo,
+        temp_download_dir: &PathBuf,
+    ) -> anyhow::Result<()> {
+        let archive_format = self
+            .app
+            .state::<RwLock<Config>>()
+            .read_or_panic()
+            .archive_format
+            .clone();
+
+        let Some(parent) = temp_download_dir.parent() else {
+            let err_msg = Some(format!("无法获取 {temp_download_dir:?} 的父目录"));
+            emit_end_event(&self.app, ep_info.episode_id, err_msg);
+            return Ok(());
+        };
+
+        let download_dir = parent.join(&ep_info.episode_title);
+
+        match archive_format {
+            ArchiveFormat::Image => {
+                if download_dir.exists() {
+                    std::fs::remove_dir_all(&download_dir)
+                        .context(format!("删除 {download_dir:?} 失败"))?;
+                }
+
+                std::fs::rename(temp_download_dir, &download_dir).context(format!(
                     "将 {temp_download_dir:?} 重命名为 {download_dir:?} 失败"
                 ))?;
             }
-            emit_end_event(&self.app, ep_info.episode_id, None);
-        } else {
-            let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
-            emit_end_event(&self.app, ep_info.episode_id, err_msg);
-        };
+            ArchiveFormat::Cbz | ArchiveFormat::Zip => {
+                let comic_info_path = temp_download_dir.join("ComicInfo.xml");
+                let comic_info_xml = yaserde::ser::to_string(&ep_info.comic_info)
+                    .map_err(|err_msg| anyhow!("序列化 {comic_info_path:?} 失败: {err_msg}"))?;
+                std::fs::write(&comic_info_path, comic_info_xml)
+                    .context(format!("创建 {comic_info_path:?} 失败"))?;
+
+                let zip_path = download_dir.with_extension(archive_format.extension());
+                let zip_file =
+                    File::create(&zip_path).context(format!("创建 {zip_path:?} 失败"))?;
+
+                let mut zip_writer = ZipWriter::new(zip_file);
+
+                for entry in std::fs::read_dir(temp_download_dir)?.filter_map(Result::ok) {
+                    let path = entry.path();
+                    if !path.is_file() {
+                        continue;
+                    }
+
+                    let filename = match path.file_name() {
+                        Some(name) => name.to_string_lossy(),
+                        None => continue,
+                    };
+
+                    zip_writer
+                        .start_file(&filename, SimpleFileOptions::default())
+                        .context(format!("在 {zip_path:?} 创建 {filename:?} 失败"))?;
+
+                    let mut file = File::open(&path).context(format!("打开 {path:?} 失败"))?;
+
+                    std::io::copy(&mut file, &mut zip_writer)
+                        .context(format!("将 {path:?} 写入 {zip_path:?} 失败"))?;
+                }
+
+                zip_writer
+                    .finish()
+                    .context(format!("关闭 {zip_path:?} 失败"))?;
+
+                std::fs::remove_dir_all(temp_download_dir)
+                    .context(format!("删除 {temp_download_dir:?} 失败"))?;
+            }
+        }
         Ok(())
     }
 
@@ -245,6 +324,7 @@ impl DownloadManager {
             self.total_image_count.store(0, Ordering::Relaxed);
         }
         // 检查此章节的图片是否全部下载成功
+        // TODO: 重构下面的代码
         let current = current.load(Ordering::Relaxed);
         if current == total {
             // 下载成功，则把临时目录重命名为正式目录
