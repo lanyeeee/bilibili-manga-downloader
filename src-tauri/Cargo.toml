@@ -21,8 +21,10 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = { version = "2" }
 tauri-plugin-dialog = { version = "2" }
+
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
+yaserde = { version = "0.11.2", features = ["yaserde_derive"] }
 
 specta = { version = "2.0.0-rc" }
 tauri-specta = { version = "2.0.0-rc", features = ["derive", "typescript"] }
@@ -40,6 +42,8 @@ showfile = { version = "0.1.1" }
 path-slash = { version = "0.2.1" }
 url = { version = "2.5.2" }
 md5 = { version = "0.7.0" }
+chrono = { version = "0.4.38" }
+zip = { version = "2.2.0", default-features = false }
 
 [profile.release]
 strip = true
