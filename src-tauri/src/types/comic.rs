@@ -171,14 +171,14 @@ impl Comic {
                 // TODO: 把构造EpisodeInfo的逻辑提取到一个函数中
                 let episode_info = EpisodeInfo {
                     episode_id,
-                    episode_title,
+                    episode_title: episode_title.clone(),
                     comic_id: resp_data.id,
-                    comic_title,
+                    comic_title: comic_title.clone(),
                     is_locked: ep.is_locked,
                     is_downloaded,
                     comic_info: ComicInfo {
                         manga: "Yes".to_string(),
-                        series: resp_data.title.clone(),
+                        series: comic_title.clone(),
                         publisher: "哔哩哔哩漫画".to_string(),
                         writer: resp_data
                             .authors
@@ -189,7 +189,7 @@ impl Comic {
                         genre: resp_data.styles.join(", "),
                         summary: resp_data.evaluate.clone(),
                         count: resp_data.total,
-                        title: ep.title, // TODO: 这里应该用episode_title
+                        title: episode_title.clone(),
                         number: ep.ord.to_string(),
                         page_count: ep.image_count,
                         year: pub_time.year(),
