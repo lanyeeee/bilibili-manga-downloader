@@ -227,12 +227,7 @@ impl DownloadManager {
                 std::fs::write(&comic_info_path, comic_info_xml)
                     .context(format!("创建 {comic_info_path:?} 失败"))?;
 
-                let extension = match archive_format {
-                    ArchiveFormat::Cbz => "cbz",
-                    ArchiveFormat::Zip => "zip",
-                    _ => unreachable!(),
-                };
-                let zip_path = download_dir.with_extension(extension);
+                let zip_path = download_dir.with_extension(archive_format.extension());
                 let zip_file =
                     File::create(&zip_path).context(format!("创建 {zip_path:?} 失败"))?;
 

@@ -8,3 +8,12 @@ pub enum ArchiveFormat {
     Zip,
     Cbz,
 }
+impl ArchiveFormat {
+    pub fn extension(&self) -> &str {
+        match self {
+            ArchiveFormat::Image => "",
+            ArchiveFormat::Zip => "zip",
+            ArchiveFormat::Cbz => "cbz",
+        }
+    }
+}
