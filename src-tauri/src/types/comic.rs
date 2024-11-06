@@ -169,6 +169,7 @@ impl Comic {
                     Self::get_is_downloaded(app, &episode_title, &comic_title).ok()?;
                 const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
                 let pub_time = NaiveDateTime::parse_from_str(&ep.pub_time, TIME_FORMAT).ok()?;
+                // TODO: 把构造EpisodeInfo的逻辑提取到一个函数中
                 let episode_info = EpisodeInfo {
                     episode_id,
                     episode_title,
@@ -189,7 +190,7 @@ impl Comic {
                         genre: resp_data.styles.join(", "),
                         summary: resp_data.evaluate.clone(),
                         count: resp_data.total,
-                        title: ep.title,
+                        title: ep.title, // TODO: 这里应该用episode_title
                         number: ep.ord.to_string(),
                         page_count: ep.image_count,
                         year: pub_time.year(),

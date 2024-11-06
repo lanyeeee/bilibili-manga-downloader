@@ -43,6 +43,7 @@ path-slash = { version = "0.2.1" }
 url = { version = "2.5.2" }
 md5 = { version = "0.7.0" }
 chrono = { version = "0.4.38" }
+zip = { version = "2.2.0", default-features = false }
 
 [profile.release]
 strip = true
