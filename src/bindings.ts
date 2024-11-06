@@ -131,6 +131,7 @@ updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
 export type AlbumPlus = { list: AlbumPlusDetail[]; icon_url: string; comic_title: string; server_time: string }
 export type AlbumPlusDetail = { isLock: boolean; isDownloaded: boolean; cost: number; reward: number; item: AlbumPlusItem; unlocked_item_ids: number[] }
 export type AlbumPlusItem = { id: number; title: string; comicTitle: string; pic: string[] }
+export type ArchiveFormat = "Image" | "Zip" | "Cbz"
 export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
 export type AutoPayOrder = { id: number; title: string }
@@ -139,7 +140,7 @@ export type Comic = { id: number; title: string; comic_type: number; page_defaul
 export type ComicInSearchRespData = { id: number; title: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData }
 export type ComicInfo = { manga: string; series: string; publisher: string; writer: string; genre: string; summary: string; count: number; title: string; number: string; pageCount: number; year: number; month: number; day: number }
 export type CommandError = string
-export type Config = { accessToken: string; downloadDir: string }
+export type Config = { accessToken: string; downloadDir: string; archiveFormat: ArchiveFormat }
 export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
 export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
 export type DataInfo = { read_score: ReadScore; interactive_value: InteractiveValue }
