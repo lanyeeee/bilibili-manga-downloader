@@ -14,6 +14,9 @@ use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use reqwest::StatusCode;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::policies::ExponentialBackoff;
+use reqwest_retry::RetryTransientMiddleware;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
@@ -112,6 +115,7 @@ impl DownloadManager {
     async fn process_episode(self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
         emit_pending_event(&self.app, ep_info.episode_id, ep_info.episode_title.clone());
 
+        let http_client = create_http_client();
         let bili_client = self.bili_client();
         let image_index_resp_data = bili_client.get_image_index(ep_info.episode_id).await?;
         let urls: Vec<String> = image_index_resp_data
@@ -142,14 +146,16 @@ impl DownloadManager {
             ep_info.episode_title.clone(),
             total,
         );
+
         for (i, url) in urls.iter().enumerate() {
+            let http_client = http_client.clone();
             let manager = self.clone();
             let url = url.clone();
             let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             let ep_id = ep_info.episode_id;
             let current = current.clone();
             // 创建下载任务
-            join_set.spawn(manager.download_image(url, save_path, ep_id, current));
+            join_set.spawn(manager.download_image(http_client, url, save_path, ep_id, current));
         }
         // 逐一处理完成的下载任务
         while let Some(completed_task) = join_set.join_next().await {
@@ -269,6 +275,7 @@ impl DownloadManager {
     async fn process_album_plus(self, album_plus_item: AlbumPlusItem) -> anyhow::Result<()> {
         emit_pending_event(&self.app, album_plus_item.id, album_plus_item.title.clone());
 
+        let http_client = create_http_client();
         let bili_client = self.bili_client();
         let image_token_data_data = bili_client.get_image_token(&album_plus_item.pic).await?;
 
@@ -294,13 +301,20 @@ impl DownloadManager {
             total,
         );
         for (i, url) in urls.iter().enumerate() {
+            let http_client = http_client.clone();
             let manager = self.clone();
             let url = url.clone();
             let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             let album_plus_id = album_plus_item.id;
             let current = current.clone();
             // 创建下载任务
-            join_set.spawn(manager.download_image(url, save_path, album_plus_id, current));
+            join_set.spawn(manager.download_image(
+                http_client,
+                url,
+                save_path,
+                album_plus_id,
+                current,
+            ));
         }
         // 逐一处理完成的下载任务
         while let Some(completed_task) = join_set.join_next().await {
@@ -345,6 +359,7 @@ impl DownloadManager {
     // TODO: 把current变量名改成downloaded_count比较合适
     async fn download_image(
         self,
+        http_client: ClientWithMiddleware,
         url: String,
         save_path: PathBuf,
         id: i64,
@@ -359,7 +374,7 @@ impl DownloadManager {
                 return;
             }
         };
-        let image_data = match get_image_bytes(&url).await {
+        let image_data = match get_image_bytes(http_client, &url).await {
             Ok(data) => data,
             Err(err) => {
                 let err = err.context(format!("下载图片 {url} 失败"));
@@ -461,10 +476,9 @@ fn emit_download_speed_event(app: &AppHandle, speed: String) {
     let _ = event.emit(app);
 }
 
-async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
-    // TODO: 添加重试机制
+async fn get_image_bytes(http_client: ClientWithMiddleware, url: &str) -> anyhow::Result<Bytes> {
     // 发送下载图片请求
-    let http_resp = reqwest::get(url).await?;
+    let http_resp = http_client.get(url).send().await?;
     // 检查http响应状态码
     let status = http_resp.status();
     if status != StatusCode::OK {
@@ -475,4 +489,12 @@ async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
     let image_data = http_resp.bytes().await?;
 
     Ok(image_data)
+}
+
+fn create_http_client() -> ClientWithMiddleware {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
+
+    reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build()
 }
