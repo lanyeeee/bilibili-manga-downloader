@@ -41,6 +41,15 @@ https://github.com/user-attachments/assets/dc4d5b63-dba6-4d72-b9d1-c9b0b6f79ef3
 1. 根据下面的**如何构建(build)**，自行编译
 2. 希望你相信我的承诺，我承诺你在[Release页面](https://github.com/lanyeeee/bilibili-manga-downloader/releases)下载到的所有东西都是安全的
 
+# 关于软件传播
+
+私下传播的软件可能因篡改而携带病毒，为避免用户因使用私下传播的版本而感染病毒，甚至因此来找我麻烦  
+我只保证在[Release页面](https://github.com/lanyeeee/bilibili-manga-downloader/releases)下载到的东西是安全的  
+
+若需要私下传播该软件，请务必进行以下操作：
+1. 修改软件标识符(`src-tauri/tauri.conf.json`的`identifier`字段)然后重新编译
+2. 仅传播经过重新编译的版本，并明确标注这是经过修改的版本
+
 # 如何构建(build)
 
 构建非常简单，一共就3条命令 
