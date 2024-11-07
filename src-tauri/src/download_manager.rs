@@ -14,6 +14,9 @@ use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use reqwest::StatusCode;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::policies::ExponentialBackoff;
+use reqwest_retry::RetryTransientMiddleware;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
@@ -356,7 +359,7 @@ impl DownloadManager {
     // TODO: 把current变量名改成downloaded_count比较合适
     async fn download_image(
         self,
-        http_client: reqwest::Client,
+        http_client: ClientWithMiddleware,
         url: String,
         save_path: PathBuf,
         id: i64,
@@ -402,10 +405,6 @@ impl DownloadManager {
     fn bili_client(&self) -> BiliClient {
         self.app.state::<BiliClient>().inner().clone()
     }
-}
-
-fn create_http_client() -> reqwest::Client {
-    reqwest::Client::new()
 }
 
 fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
@@ -477,8 +476,7 @@ fn emit_download_speed_event(app: &AppHandle, speed: String) {
     let _ = event.emit(app);
 }
 
-async fn get_image_bytes(http_client: reqwest::Client, url: &str) -> anyhow::Result<Bytes> {
-    // TODO: 添加重试机制
+async fn get_image_bytes(http_client: ClientWithMiddleware, url: &str) -> anyhow::Result<Bytes> {
     // 发送下载图片请求
     let http_resp = http_client.get(url).send().await?;
     // 检查http响应状态码
@@ -491,4 +489,12 @@ async fn get_image_bytes(http_client: reqwest::Client, url: &str) -> anyhow::Res
     let image_data = http_resp.bytes().await?;
 
     Ok(image_data)
+}
+
+fn create_http_client() -> ClientWithMiddleware {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
+
+    reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build()
 }
