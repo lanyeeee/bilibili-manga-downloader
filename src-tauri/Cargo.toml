@@ -47,6 +47,7 @@ url = { version = "2.5.2" }
 md5 = { version = "0.7.0" }
 chrono = { version = "0.4.38" }
 zip = { version = "2.2.0", default-features = false }
+parking_lot = { version = "0.12.3", features = ["send_guard"] }
 
 [profile.release]
 strip = true

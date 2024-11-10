@@ -1,18 +1,19 @@
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::bili_client::BiliClient;
 use crate::config::Config;
 use crate::events;
 use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
-use crate::extensions::{AnyhowErrorToStringChain, IgnoreRwLockPoison};
+use crate::extensions::AnyhowErrorToStringChain;
 use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 
 use anyhow::{anyhow, Context};
 use bytes::Bytes;
+use parking_lot::RwLock;
 use reqwest::StatusCode;
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
@@ -204,7 +205,7 @@ impl DownloadManager {
         let archive_format = self
             .app
             .state::<RwLock<Config>>()
-            .read_or_panic()
+            .read()
             .archive_format
             .clone();
 
@@ -410,7 +411,7 @@ impl DownloadManager {
 
 fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
     app.state::<RwLock<Config>>()
-        .read_or_panic()
+        .read()
         .download_dir
         .join(&ep_info.comic_title)
         .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
@@ -418,7 +419,7 @@ fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
 
 fn get_album_plus_temp_download_dir(app: &AppHandle, album_plus_item: &AlbumPlusItem) -> PathBuf {
     app.state::<RwLock<Config>>()
-        .read_or_panic()
+        .read()
         .download_dir
         .join(&album_plus_item.comic_title)
         .join("特典")
