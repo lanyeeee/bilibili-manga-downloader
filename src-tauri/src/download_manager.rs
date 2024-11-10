@@ -53,7 +53,7 @@ pub struct DownloadManager {
 impl DownloadManager {
     pub fn new(app: AppHandle) -> Self {
         let (sender, receiver) = mpsc::channel::<DownloadPayload>(32);
-        let ep_sem = Arc::new(Semaphore::new(16));
+        let ep_sem = Arc::new(Semaphore::new(4));
         let img_sem = Arc::new(Semaphore::new(50));
         let manager = DownloadManager {
             app,
@@ -84,6 +84,7 @@ impl DownloadManager {
     }
 
     #[allow(clippy::cast_precision_loss)]
+    // TODO: 换个函数名，如emit_download_speed_loop
     async fn log_download_speed(self) {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
 
@@ -214,7 +215,7 @@ impl DownloadManager {
         };
 
         let download_dir = parent.join(&ep_info.episode_title);
-
+        // TODO: 把每种格式的保存操作提取到一个函数里
         match archive_format {
             ArchiveFormat::Image => {
                 if download_dir.exists() {
