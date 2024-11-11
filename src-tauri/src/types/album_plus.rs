@@ -1,10 +1,8 @@
-use std::sync::RwLock;
-
 use crate::config::Config;
-use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::AlbumPlusRespData;
 use crate::utils::filename_filter;
 
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
@@ -57,7 +55,7 @@ impl AlbumPlus {
 
     fn get_is_downloaded(app: &AppHandle, album_plus_title: &str, comic_title: &str) -> bool {
         app.state::<RwLock<Config>>()
-            .read_or_panic()
+            .read()
             .download_dir
             .join(comic_title)
             .join("特典")

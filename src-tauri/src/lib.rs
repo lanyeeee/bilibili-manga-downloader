@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::download_manager::DownloadManager;
 use crate::events::prelude::*;
 use anyhow::Context;
+use parking_lot::RwLock;
 use tauri::{Manager, Wry};
 
 fn generate_context() -> tauri::Context<Wry> {
@@ -78,10 +79,10 @@ pub fn run() {
                 .context(format!("failed to create app data dir: {app_data_dir:?}"))?;
             println!("app data dir: {app_data_dir:?}");
 
-            let config = std::sync::RwLock::new(Config::new(app.handle())?);
+            let config = RwLock::new(Config::new(app.handle())?);
             app.manage(config);
 
-            let download_manager = DownloadManager::new(app.handle().clone());
+            let download_manager = RwLock::new(DownloadManager::new(app.handle()));
             app.manage(download_manager);
 
             let bili_client = bili_client::BiliClient::new(app.handle().clone());
