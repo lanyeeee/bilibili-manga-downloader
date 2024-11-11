@@ -52,12 +52,19 @@ pub struct DownloadManager {
 }
 
 impl DownloadManager {
-    pub fn new(app: AppHandle) -> Self {
+    pub fn new(app: &AppHandle) -> Self {
         let (sender, receiver) = mpsc::channel::<DownloadPayload>(32);
-        let ep_sem = Arc::new(Semaphore::new(4));
-        let img_sem = Arc::new(Semaphore::new(50));
+
+        let (episode_concurrency, image_concurrency) = {
+            let config = app.state::<RwLock<Config>>();
+            let config = config.read();
+            (config.episode_concurrency, config.image_concurrency)
+        };
+        let ep_sem = Arc::new(Semaphore::new(episode_concurrency));
+        let img_sem = Arc::new(Semaphore::new(image_concurrency));
+
         let manager = DownloadManager {
-            app,
+            app: app.clone(),
             sender: Arc::new(sender),
             ep_sem,
             img_sem,
@@ -66,8 +73,8 @@ impl DownloadManager {
             total_image_count: Arc::new(AtomicU32::new(0)),
         };
 
-        tauri::async_runtime::spawn(manager.clone().log_download_speed());
-        tauri::async_runtime::spawn(manager.clone().receiver_loop(receiver));
+        tauri::async_runtime::spawn(Self::log_download_speed(app.clone()));
+        tauri::async_runtime::spawn(Self::receiver_loop(app.clone(), receiver));
 
         manager
     }
@@ -84,23 +91,33 @@ impl DownloadManager {
         Ok(())
     }
 
+    pub fn set_episode_concurrency(&mut self, concurrency: usize) {
+        self.ep_sem = Arc::new(Semaphore::new(concurrency));
+    }
+
+    pub fn set_image_concurrency(&mut self, concurrency: usize) {
+        self.img_sem = Arc::new(Semaphore::new(concurrency));
+    }
+
     #[allow(clippy::cast_precision_loss)]
     // TODO: 换个函数名，如emit_download_speed_loop
-    async fn log_download_speed(self) {
+    async fn log_download_speed(app: AppHandle) {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
 
         loop {
             interval.tick().await;
-            let byte_per_sec = self.byte_per_sec.swap(0, Ordering::Relaxed);
+            let manager = app.state::<RwLock<DownloadManager>>();
+            let manager = manager.read();
+            let byte_per_sec = manager.byte_per_sec.swap(0, Ordering::Relaxed);
             let mega_byte_per_sec = byte_per_sec as f64 / 1024.0 / 1024.0;
             let speed = format!("{mega_byte_per_sec:.2} MB/s");
-            emit_download_speed_event(&self.app, speed);
+            emit_download_speed_event(&app, speed);
         }
     }
 
-    async fn receiver_loop(self, mut receiver: Receiver<DownloadPayload>) {
+    async fn receiver_loop(app: AppHandle, mut receiver: Receiver<DownloadPayload>) {
         while let Some(payload) = receiver.recv().await {
-            let manager = self.clone();
+            let manager = app.state::<RwLock<DownloadManager>>().read().clone();
             match payload {
                 DownloadPayload::Episode(ep_info) => {
                     tauri::async_runtime::spawn(manager.process_episode(ep_info));
@@ -172,6 +189,14 @@ impl DownloadManager {
                 total_image_count,
             );
         }
+        // 等待一段时间
+        let episode_download_interval = self
+            .app
+            .state::<RwLock<Config>>()
+            .read()
+            .episode_download_interval;
+        tokio::time::sleep(Duration::from_secs(episode_download_interval)).await;
+        // 然后才继续下载下一章节
         drop(permit);
         // 如果DownloadManager所有图片全部都已下载(无论成功或失败)，则清空下载进度
         let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
