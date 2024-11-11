@@ -145,6 +145,7 @@ async function refreshEpisodes() {
 <template>
   <div class="h-full flex flex-col">
     <div class="flex flex-justify-around">
+      <!--   TODO: 还要把特典算在内   -->
       <span>总章数：{{ selectedComic?.episodeInfos.length }}</span>
       <n-divider vertical></n-divider>
       <span>已解锁：{{ selectedComic?.episodeInfos.filter(ep => !ep.isLocked).length }}</span>
@@ -161,41 +162,51 @@ async function refreshEpisodes() {
         下载勾选项
       </n-button>
     </div>
-    <n-empty v-if="selectedComic===undefined" description="请先进行漫画搜索">
-    </n-empty>
-    <SelectionArea v-else
-                   ref="selectionAreaRef"
-                   class="selection-container"
-                   :options="{selectables: '.selectable', features: {deselectOnBlur: true}} as SelectionOptions"
-                   @contextmenu="onContextMenu"
-                   @move="onDragMove"
-                   @start="onDragStart">
-      <n-checkbox-group v-model:value="checkedIds" class="h-full flex flex-col">
-        <div class="grid grid-cols-3 gap-1.5 w-full overflow-auto">
-          <n-checkbox v-for="{episodeId, episodeTitle, isLocked, isDownloaded} in selectedComic.episodeInfos"
-                      :key="episodeId"
-                      :data-key="episodeId"
-                      class="selectable hover:bg-gray-200!"
-                      :value="episodeId"
-                      :label="episodeTitle"
-                      :disabled="isLocked || isDownloaded"
-                      :class="{ selected: selectedIds.has(episodeId), downloaded: isDownloaded }"/>
-        </div>
-        <n-divider class="my-1!" title-placement="left">
-          特典
-        </n-divider>
-        <div class="grid grid-cols-3 gap-1.5 w-full pb-3">
-          <n-checkbox v-for="{isLock, isDownloaded, item} in selectedComic.albumPlus.list"
-                      :key="item.id"
-                      :data-key="item.id"
-                      class="selectable hover:bg-gray-200!"
-                      :value="item.id"
-                      :label="item.title"
-                      :disabled="isLock || isDownloaded"
-                      :class="{ selected: selectedIds.has(item.id), downloaded: isDownloaded }"/>
-        </div>
-      </n-checkbox-group>
-    </SelectionArea>
+    <n-empty v-if="selectedComic===undefined" description="请先进行漫画搜索"/>
+    <div v-else class="flex-1 flex flex-col overflow-auto">
+      <SelectionArea ref="selectionAreaRef"
+                     class="selection-container flex-grow"
+                     :options="{selectables: '.selectable', features: {deselectOnBlur: true}} as SelectionOptions"
+                     @contextmenu="onContextMenu"
+                     @move="onDragMove"
+                     @start="onDragStart">
+        <n-checkbox-group v-model:value="checkedIds" class="flex flex-col">
+          <div class="grid grid-cols-3 gap-1.5 w-full">
+            <n-checkbox v-for="{episodeId, episodeTitle, isLocked, isDownloaded} in selectedComic.episodeInfos"
+                        :key="episodeId"
+                        :data-key="episodeId"
+                        class="selectable hover:bg-gray-200!"
+                        :value="episodeId"
+                        :label="episodeTitle"
+                        :disabled="isLocked || isDownloaded"
+                        :class="{ selected: selectedIds.has(episodeId), downloaded: isDownloaded }"/>
+          </div>
+        </n-checkbox-group>
+      </SelectionArea>
+      <n-divider class="my-1!" title-placement="left">
+        特典
+      </n-divider>
+      <SelectionArea ref="selectionAreaRef"
+                     class="selection-container flex-shrink-0 mb-3"
+                     :options="{selectables: '.selectable', features: {deselectOnBlur: true}} as SelectionOptions"
+                     @contextmenu="onContextMenu"
+                     @move="onDragMove"
+                     @start="onDragStart">
+        <n-checkbox-group v-model:value="checkedIds" class="flex flex-col">
+          <div class="grid grid-cols-3 gap-1.5 w-full">
+            <n-checkbox v-for="{isLock, isDownloaded, item} in selectedComic.albumPlus.list"
+                        :key="item.id"
+                        :data-key="item.id"
+                        class="selectable hover:bg-gray-200!"
+                        :value="item.id"
+                        :label="item.title"
+                        :disabled="isLock || isDownloaded"
+                        :class="{ selected: selectedIds.has(item.id), downloaded: isDownloaded }"/>
+          </div>
+        </n-checkbox-group>
+      </SelectionArea>
+    </div>
+
 
     <n-dropdown
         placement="bottom-start"

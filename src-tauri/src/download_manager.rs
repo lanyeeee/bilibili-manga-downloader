@@ -1,24 +1,32 @@
+use std::fs::File;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
-
-use anyhow::{anyhow, Context};
-use bytes::Bytes;
-use reqwest::StatusCode;
-use tauri::{AppHandle, Manager};
-use tauri_specta::Event;
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::{mpsc, Semaphore};
-use tokio::task::JoinSet;
 
 use crate::bili_client::BiliClient;
 use crate::config::Config;
 use crate::events;
 use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
-use crate::extensions::{AnyhowErrorToStringChain, IgnoreRwLockPoison};
-use crate::types::{AlbumPlusItem, EpisodeInfo};
+use crate::extensions::AnyhowErrorToStringChain;
+use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 
+use anyhow::{anyhow, Context};
+use bytes::Bytes;
+use parking_lot::RwLock;
+use reqwest::StatusCode;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::policies::ExponentialBackoff;
+use reqwest_retry::RetryTransientMiddleware;
+use tauri::{AppHandle, Manager};
+use tauri_specta::Event;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::{mpsc, Semaphore};
+use tokio::task::JoinSet;
+use zip::write::SimpleFileOptions;
+use zip::ZipWriter;
+
+// TODO: EpisodeInfo与AlbumPlusItem的内存差距过大，应该用Box包裹EpisodeInfo
 enum DownloadPayload {
     Episode(EpisodeInfo),
     AlbumPlus(AlbumPlusItem),
@@ -44,12 +52,19 @@ pub struct DownloadManager {
 }
 
 impl DownloadManager {
-    pub fn new(app: AppHandle) -> Self {
+    pub fn new(app: &AppHandle) -> Self {
         let (sender, receiver) = mpsc::channel::<DownloadPayload>(32);
-        let ep_sem = Arc::new(Semaphore::new(16));
-        let img_sem = Arc::new(Semaphore::new(50));
+
+        let (episode_concurrency, image_concurrency) = {
+            let config = app.state::<RwLock<Config>>();
+            let config = config.read();
+            (config.episode_concurrency, config.image_concurrency)
+        };
+        let ep_sem = Arc::new(Semaphore::new(episode_concurrency));
+        let img_sem = Arc::new(Semaphore::new(image_concurrency));
+
         let manager = DownloadManager {
-            app,
+            app: app.clone(),
             sender: Arc::new(sender),
             ep_sem,
             img_sem,
@@ -58,8 +73,8 @@ impl DownloadManager {
             total_image_count: Arc::new(AtomicU32::new(0)),
         };
 
-        tauri::async_runtime::spawn(manager.clone().log_download_speed());
-        tauri::async_runtime::spawn(manager.clone().receiver_loop(receiver));
+        tauri::async_runtime::spawn(Self::log_download_speed(app.clone()));
+        tauri::async_runtime::spawn(Self::receiver_loop(app.clone(), receiver));
 
         manager
     }
@@ -76,22 +91,33 @@ impl DownloadManager {
         Ok(())
     }
 
+    pub fn set_episode_concurrency(&mut self, concurrency: usize) {
+        self.ep_sem = Arc::new(Semaphore::new(concurrency));
+    }
+
+    pub fn set_image_concurrency(&mut self, concurrency: usize) {
+        self.img_sem = Arc::new(Semaphore::new(concurrency));
+    }
+
     #[allow(clippy::cast_precision_loss)]
-    async fn log_download_speed(self) {
+    // TODO: 换个函数名，如emit_download_speed_loop
+    async fn log_download_speed(app: AppHandle) {
         let mut interval = tokio::time::interval(Duration::from_secs(1));
 
         loop {
             interval.tick().await;
-            let byte_per_sec = self.byte_per_sec.swap(0, Ordering::Relaxed);
+            let manager = app.state::<RwLock<DownloadManager>>();
+            let manager = manager.read();
+            let byte_per_sec = manager.byte_per_sec.swap(0, Ordering::Relaxed);
             let mega_byte_per_sec = byte_per_sec as f64 / 1024.0 / 1024.0;
             let speed = format!("{mega_byte_per_sec:.2} MB/s");
-            emit_download_speed_event(&self.app, speed);
+            emit_download_speed_event(&app, speed);
         }
     }
 
-    async fn receiver_loop(self, mut receiver: Receiver<DownloadPayload>) {
+    async fn receiver_loop(app: AppHandle, mut receiver: Receiver<DownloadPayload>) {
         while let Some(payload) = receiver.recv().await {
-            let manager = self.clone();
+            let manager = app.state::<RwLock<DownloadManager>>().read().clone();
             match payload {
                 DownloadPayload::Episode(ep_info) => {
                     tauri::async_runtime::spawn(manager.process_episode(ep_info));
@@ -108,6 +134,7 @@ impl DownloadManager {
     async fn process_episode(self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
         emit_pending_event(&self.app, ep_info.episode_id, ep_info.episode_title.clone());
 
+        let http_client = create_http_client();
         let bili_client = self.bili_client();
         let image_index_resp_data = bili_client.get_image_index(ep_info.episode_id).await?;
         let urls: Vec<String> = image_index_resp_data
@@ -138,14 +165,16 @@ impl DownloadManager {
             ep_info.episode_title.clone(),
             total,
         );
+
         for (i, url) in urls.iter().enumerate() {
+            let http_client = http_client.clone();
             let manager = self.clone();
             let url = url.clone();
             let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             let ep_id = ep_info.episode_id;
             let current = current.clone();
             // 创建下载任务
-            join_set.spawn(manager.download_image(url, save_path, ep_id, current));
+            join_set.spawn(manager.download_image(http_client, url, save_path, ep_id, current));
         }
         // 逐一处理完成的下载任务
         while let Some(completed_task) = join_set.join_next().await {
@@ -160,6 +189,14 @@ impl DownloadManager {
                 total_image_count,
             );
         }
+        // 等待一段时间
+        let episode_download_interval = self
+            .app
+            .state::<RwLock<Config>>()
+            .read()
+            .episode_download_interval;
+        tokio::time::sleep(Duration::from_secs(episode_download_interval)).await;
+        // 然后才继续下载下一章节
         drop(permit);
         // 如果DownloadManager所有图片全部都已下载(无论成功或失败)，则清空下载进度
         let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
@@ -170,19 +207,94 @@ impl DownloadManager {
         }
         // 检查此章节的图片是否全部下载成功
         let current = current.load(Ordering::Relaxed);
-        if current == total {
-            // 下载成功，则把临时目录重命名为正式目录
-            if let Some(parent) = temp_download_dir.parent() {
-                let download_dir = parent.join(&ep_info.episode_title);
-                std::fs::rename(&temp_download_dir, &download_dir).context(format!(
+        // 此章节的图片未全部下载成功
+        if current != total {
+            let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
+            emit_end_event(&self.app, ep_info.episode_id, err_msg);
+            return Ok(());
+        }
+        // 此章节的图片全部下载成功
+        let err_msg = match self.save_archive(&ep_info, &temp_download_dir) {
+            Ok(_) => None,
+            Err(err) => Some(err.to_string_chain()),
+        };
+        emit_end_event(&self.app, ep_info.episode_id, err_msg);
+        Ok(())
+    }
+
+    fn save_archive(
+        &self,
+        ep_info: &EpisodeInfo,
+        temp_download_dir: &PathBuf,
+    ) -> anyhow::Result<()> {
+        let archive_format = self
+            .app
+            .state::<RwLock<Config>>()
+            .read()
+            .archive_format
+            .clone();
+
+        let Some(parent) = temp_download_dir.parent() else {
+            let err_msg = Some(format!("无法获取 {temp_download_dir:?} 的父目录"));
+            emit_end_event(&self.app, ep_info.episode_id, err_msg);
+            return Ok(());
+        };
+
+        let download_dir = parent.join(&ep_info.episode_title);
+        // TODO: 把每种格式的保存操作提取到一个函数里
+        match archive_format {
+            ArchiveFormat::Image => {
+                if download_dir.exists() {
+                    std::fs::remove_dir_all(&download_dir)
+                        .context(format!("删除 {download_dir:?} 失败"))?;
+                }
+
+                std::fs::rename(temp_download_dir, &download_dir).context(format!(
                     "将 {temp_download_dir:?} 重命名为 {download_dir:?} 失败"
                 ))?;
             }
-            emit_end_event(&self.app, ep_info.episode_id, None);
-        } else {
-            let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
-            emit_end_event(&self.app, ep_info.episode_id, err_msg);
-        };
+            ArchiveFormat::Cbz | ArchiveFormat::Zip => {
+                let comic_info_path = temp_download_dir.join("ComicInfo.xml");
+                let comic_info_xml = yaserde::ser::to_string(&ep_info.comic_info)
+                    .map_err(|err_msg| anyhow!("序列化 {comic_info_path:?} 失败: {err_msg}"))?;
+                std::fs::write(&comic_info_path, comic_info_xml)
+                    .context(format!("创建 {comic_info_path:?} 失败"))?;
+
+                let zip_path = download_dir.with_extension(archive_format.extension());
+                let zip_file =
+                    File::create(&zip_path).context(format!("创建 {zip_path:?} 失败"))?;
+
+                let mut zip_writer = ZipWriter::new(zip_file);
+
+                for entry in std::fs::read_dir(temp_download_dir)?.filter_map(Result::ok) {
+                    let path = entry.path();
+                    if !path.is_file() {
+                        continue;
+                    }
+
+                    let filename = match path.file_name() {
+                        Some(name) => name.to_string_lossy(),
+                        None => continue,
+                    };
+
+                    zip_writer
+                        .start_file(&filename, SimpleFileOptions::default())
+                        .context(format!("在 {zip_path:?} 创建 {filename:?} 失败"))?;
+
+                    let mut file = File::open(&path).context(format!("打开 {path:?} 失败"))?;
+
+                    std::io::copy(&mut file, &mut zip_writer)
+                        .context(format!("将 {path:?} 写入 {zip_path:?} 失败"))?;
+                }
+
+                zip_writer
+                    .finish()
+                    .context(format!("关闭 {zip_path:?} 失败"))?;
+
+                std::fs::remove_dir_all(temp_download_dir)
+                    .context(format!("删除 {temp_download_dir:?} 失败"))?;
+            }
+        }
         Ok(())
     }
 
@@ -190,6 +302,7 @@ impl DownloadManager {
     async fn process_album_plus(self, album_plus_item: AlbumPlusItem) -> anyhow::Result<()> {
         emit_pending_event(&self.app, album_plus_item.id, album_plus_item.title.clone());
 
+        let http_client = create_http_client();
         let bili_client = self.bili_client();
         let image_token_data_data = bili_client.get_image_token(&album_plus_item.pic).await?;
 
@@ -215,13 +328,20 @@ impl DownloadManager {
             total,
         );
         for (i, url) in urls.iter().enumerate() {
+            let http_client = http_client.clone();
             let manager = self.clone();
             let url = url.clone();
             let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             let album_plus_id = album_plus_item.id;
             let current = current.clone();
             // 创建下载任务
-            join_set.spawn(manager.download_image(url, save_path, album_plus_id, current));
+            join_set.spawn(manager.download_image(
+                http_client,
+                url,
+                save_path,
+                album_plus_id,
+                current,
+            ));
         }
         // 逐一处理完成的下载任务
         while let Some(completed_task) = join_set.join_next().await {
@@ -245,6 +365,7 @@ impl DownloadManager {
             self.total_image_count.store(0, Ordering::Relaxed);
         }
         // 检查此章节的图片是否全部下载成功
+        // TODO: 重构下面的代码
         let current = current.load(Ordering::Relaxed);
         if current == total {
             // 下载成功，则把临时目录重命名为正式目录
@@ -265,6 +386,7 @@ impl DownloadManager {
     // TODO: 把current变量名改成downloaded_count比较合适
     async fn download_image(
         self,
+        http_client: ClientWithMiddleware,
         url: String,
         save_path: PathBuf,
         id: i64,
@@ -279,7 +401,7 @@ impl DownloadManager {
                 return;
             }
         };
-        let image_data = match get_image_bytes(&url).await {
+        let image_data = match get_image_bytes(http_client, &url).await {
             Ok(data) => data,
             Err(err) => {
                 let err = err.context(format!("下载图片 {url} 失败"));
@@ -314,7 +436,7 @@ impl DownloadManager {
 
 fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
     app.state::<RwLock<Config>>()
-        .read_or_panic()
+        .read()
         .download_dir
         .join(&ep_info.comic_title)
         .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
@@ -322,7 +444,7 @@ fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
 
 fn get_album_plus_temp_download_dir(app: &AppHandle, album_plus_item: &AlbumPlusItem) -> PathBuf {
     app.state::<RwLock<Config>>()
-        .read_or_panic()
+        .read()
         .download_dir
         .join(&album_plus_item.comic_title)
         .join("特典")
@@ -381,10 +503,9 @@ fn emit_download_speed_event(app: &AppHandle, speed: String) {
     let _ = event.emit(app);
 }
 
-async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
-    // TODO: 添加重试机制
+async fn get_image_bytes(http_client: ClientWithMiddleware, url: &str) -> anyhow::Result<Bytes> {
     // 发送下载图片请求
-    let http_resp = reqwest::get(url).await?;
+    let http_resp = http_client.get(url).send().await?;
     // 检查http响应状态码
     let status = http_resp.status();
     if status != StatusCode::OK {
@@ -395,4 +516,12 @@ async fn get_image_bytes(url: &str) -> anyhow::Result<Bytes> {
     let image_data = http_resp.bytes().await?;
 
     Ok(image_data)
+}
+
+fn create_http_client() -> ClientWithMiddleware {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
+
+    reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build()
 }

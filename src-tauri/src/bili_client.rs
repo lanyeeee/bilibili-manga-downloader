@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::io::Cursor;
-use std::sync::RwLock;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
 use image::Rgb;
+use parking_lot::RwLock;
 use qrcode::QrCode;
 use reqwest::{Client, ClientBuilder, StatusCode};
 use serde_json::json;
@@ -14,7 +14,6 @@ use tauri::{AppHandle, Manager};
 use url::form_urlencoded;
 
 use crate::config::Config;
-use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{
     AlbumPlusRespData, BiliResp, ComicRespData, GenerateQrcodeRespData, ImageIndexRespData,
     ImageTokenRespData, QrcodeStatusRespData, SearchRespData, UserProfileRespData,
@@ -404,7 +403,7 @@ impl BiliClient {
     fn access_token(&self) -> String {
         self.app
             .state::<RwLock<Config>>()
-            .read_or_panic()
+            .read()
             .access_token
             .clone()
     }
