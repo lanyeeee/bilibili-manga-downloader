@@ -124,6 +124,43 @@ async function selectDownloadDir() {
       <n-radio value="Zip">zip</n-radio>
       <n-radio value="Cbz">cbz</n-radio>
     </n-radio-group>
+    <div class="grid grid-cols-[1fr_1fr_2fr]">
+      <n-tooltip placement="bottom" trigger="hover">
+        最多同时有多少个进度条正在下载
+        <template #trigger>
+          <n-input-number v-model:value="config.episodeConcurrency"
+                          placeholder=""
+                          :min="1"
+                          :show-button="false"
+                          :parse="(x:string) => parseInt(x)"
+                          size="tiny">
+            <template #prefix>章节并发数:</template>
+          </n-input-number>
+        </template>
+      </n-tooltip>
+      <n-tooltip placement="bottom" trigger="hover">
+        所有正在下载的进度条总共能同时下载的图片数量
+        <template #trigger>
+          <n-input-number v-model:value="config.imageConcurrency"
+                          placeholder=""
+                          :min="1"
+                          :show-button="false"
+                          :parse="(x:string) => parseInt(x)"
+                          size="tiny">
+            <template #prefix>图片并发数:</template>
+          </n-input-number>
+        </template>
+      </n-tooltip>
+      <n-input-number v-model:value="config.episodeDownloadInterval"
+                      placeholder=""
+                      :min="0"
+                      :show-button="false"
+                      :parse="(x:string) => parseInt(x)"
+                      size="tiny">
+        <template #prefix>每个章节下载完成后休息:</template>
+        <template #suffix>秒</template>
+      </n-input-number>
+    </div>
     <div class="grid grid-cols-[1fr_4fr_2fr]">
       <span class="text-ellipsis whitespace-nowrap overflow-hidden">{{ overallProgress.title }}</span>
       <n-progress :percentage="overallProgress.percentage" indicator-placement="inside" :height="21">
