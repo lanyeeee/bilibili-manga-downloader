@@ -12,6 +12,9 @@ pub struct Config {
     pub access_token: String,
     pub download_dir: PathBuf,
     pub archive_format: ArchiveFormat,
+    pub episode_concurrency: usize,
+    pub image_concurrency: usize,
+    pub episode_download_interval: u64,
 }
 
 impl Config {
@@ -23,6 +26,9 @@ impl Config {
             access_token: String::new(),
             download_dir: app_data_dir.join("漫画下载"),
             archive_format: ArchiveFormat::default(),
+            episode_concurrency: 4,
+            image_concurrency: 30,
+            episode_download_interval: 0,
         };
         // 如果配置文件存在且能够解析，则使用配置文件中的配置，否则使用默认配置
         let config = if config_path.exists() {

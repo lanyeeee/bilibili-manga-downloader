@@ -1,12 +1,10 @@
-use std::sync::RwLock;
-
 use crate::config::Config;
-use crate::extensions::IgnoreRwLockPoison;
 use crate::responses::{ComicRespData, EpisodeRespData};
 use crate::types::AlbumPlus;
 use crate::utils::filename_filter;
 
 use chrono::{Datelike, NaiveDateTime};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
@@ -378,7 +376,7 @@ impl Comic {
     }
     fn get_is_downloaded(app: &AppHandle, ep_title: &str, comic_title: &str) -> bool {
         let config = app.state::<RwLock<Config>>();
-        let config = config.read_or_panic();
+        let config = config.read();
         config
             .download_dir
             .join(comic_title)
