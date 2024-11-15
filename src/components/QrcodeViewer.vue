@@ -75,6 +75,7 @@ function handleQrcodeStatus() {
 
   if (code === 0) {
     config.value.accessToken = qrcodeStatus.value.access_token;
+    config.value.sessdata = qrcodeStatus.value.cookie_info.cookies.find(c => c.name === "SESSDATA")?.value ?? "";
     showing.value = false;
     message.success("登录成功");
   }

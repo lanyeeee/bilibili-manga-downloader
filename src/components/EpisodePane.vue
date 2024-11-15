@@ -164,6 +164,9 @@ async function refreshEpisodes() {
     </div>
     <n-empty v-if="selectedComic===undefined" description="请先进行漫画搜索"/>
     <div v-else class="flex-1 flex flex-col overflow-auto">
+      <n-divider class="my-0!" title-placement="left">
+        正文
+      </n-divider>
       <SelectionArea ref="selectionAreaRef"
                      class="selection-container flex-grow"
                      :options="{selectables: '.selectable', features: {deselectOnBlur: true}} as SelectionOptions"
@@ -183,11 +186,11 @@ async function refreshEpisodes() {
           </div>
         </n-checkbox-group>
       </SelectionArea>
-      <n-divider class="my-1!" title-placement="left">
+      <n-divider class="my-0!" title-placement="left">
         特典
       </n-divider>
       <SelectionArea ref="selectionAreaRef"
-                     class="selection-container flex-shrink-0 mb-3"
+                     class="selection-container flex-shrink-0 mb-3 max-h-[30%]"
                      :options="{selectables: '.selectable', features: {deselectOnBlur: true}} as SelectionOptions"
                      @contextmenu="onContextMenu"
                      @move="onDragMove"
