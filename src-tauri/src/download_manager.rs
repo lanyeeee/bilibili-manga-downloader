@@ -151,7 +151,7 @@ impl DownloadManager {
             .iter()
             .map(|img| img.path.clone())
             .collect();
-        let image_token_data_data = bili_client.get_image_token(&urls).await?;
+        let image_token_data_data = bili_client.get_image_token(&urls, true).await?;
 
         let temp_download_dir = get_ep_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
@@ -313,7 +313,9 @@ impl DownloadManager {
 
         let http_client = create_http_client();
         let bili_client = self.bili_client();
-        let image_token_data_data = bili_client.get_image_token(&album_plus_item.pic).await?;
+        let image_token_data_data = bili_client
+            .get_image_token(&album_plus_item.pic, false)
+            .await?;
 
         let temp_download_dir = get_album_plus_temp_download_dir(&self.app, &album_plus_item);
         std::fs::create_dir_all(&temp_download_dir)
@@ -427,20 +429,17 @@ impl DownloadManager {
                 return;
             }
         };
-        // 取出url中query部分的cpx参数
-        let Some((_, cpx)) = parsed_url.query_pairs().find(|(key, _)| key == "cpx") else {
-            let err = anyhow!("图片链接 {url} 中没有cpx参数");
-            emit_error_event(&self.app, id, url.to_string(), err.to_string());
-            return;
-        };
-        // 解密图片数据
-        let image_data = match decrypt_img_data(image_data, &cpx) {
-            Ok(data) => data,
-            Err(err) => {
-                let err = err.context(format!("解密图片 {url} 失败"));
-                emit_error_event(&self.app, id, url, err.to_string_chain());
-                return;
-            }
+        // 如果 parsed_url 里能找到cpx参数，则解密图片数据，否则用原始数据
+        let image_data = match parsed_url.query_pairs().find(|(key, _)| key == "cpx") {
+            Some((_, cpx)) => match decrypt_img_data(image_data, &cpx) {
+                Ok(data) => data,
+                Err(err) => {
+                    let err = err.context(format!("解密图片 {url} 失败"));
+                    emit_error_event(&self.app, id, url, err.to_string_chain());
+                    return;
+                }
+            },
+            None => image_data,
         };
         // 保存图片
         if let Err(err) = std::fs::write(&save_path, &image_data).map_err(anyhow::Error::from) {
