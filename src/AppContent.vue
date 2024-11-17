@@ -6,14 +6,14 @@ import QrcodeViewer from "./components/QrcodeViewer.vue";
 import DownloadingList from "./components/DownloadingList.vue";
 import SearchPane from "./components/SearchPane.vue";
 import EpisodePane from "./components/EpisodePane.vue";
-import {appDataDir} from "@tauri-apps/api/path";
-import {path} from "@tauri-apps/api";
+import CookieLoginDialog from "./components/CookieLoginDialog.vue";
 
 const notification = useNotification();
 const message = useMessage();
 
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
+const cookieLoginDialogShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
 const selectedComic = ref<Comic>();
 const userProfile = ref<UserProfileRespData>();
@@ -54,18 +54,13 @@ onMounted(async () => {
   config.value = await commands.getConfig();
 });
 
-async function showConfigInFileManager() {
-  const configName = "config.json";
-  const configPath = await path.join(await appDataDir(), configName);
-  const result = await commands.showPathInFileManager(configPath);
-  if (result.status === "error") {
-    notification.error({title: "打开配置文件失败", description: result.error});
-  }
-}
-
 async function test() {
-  const result = await commands.getComic(26470);
-  console.log(result);
+  notification.error({
+    title: "标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 ",
+    description: "描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 ",
+    content: "内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 ",
+  });
+
 }
 
 </script>
@@ -86,7 +81,7 @@ async function test() {
       <div class="basis-1/2 flex flex-col overflow-hidden">
         <div class="flex">
           <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
-          <n-button @click="showConfigInFileManager">打开配置目录</n-button>
+          <n-button @click="cookieLoginDialogShowing=true" type="primary" secondary>Cookie登录</n-button>
           <n-button @click="test">测试用</n-button>
           <div v-if="userProfile!==undefined" class="flex flex-justify-end">
             <n-avatar round
@@ -102,5 +97,8 @@ async function test() {
   </div>
   <n-modal preset="dialog" title="请使用BiliBili手机客户端扫描二维码登录" v-model:show="qrcodeViewerShowing">
     <qrcode-viewer v-if="config!==undefined" v-model:showing="qrcodeViewerShowing" v-model:config="config"/>
+  </n-modal>
+  <n-modal v-model:show="cookieLoginDialogShowing">
+    <cookie-login-dialog v-if="config!==undefined" v-model:showing="cookieLoginDialogShowing" v-model:config="config"/>
   </n-modal>
 </template>
