@@ -11,17 +11,9 @@ use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
 use crate::extensions::AnyhowErrorToStringChain;
 use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 
-use aes::cipher::consts::U16;
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{BlockDecrypt, KeyInit};
-use aes::Aes256;
 use anyhow::{anyhow, Context};
-use base64::engine::general_purpose;
-use base64::Engine;
-use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use parking_lot::RwLock;
-use percent_encoding::percent_decode_str;
 use reqwest::StatusCode;
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::policies::ExponentialBackoff;
@@ -31,7 +23,6 @@ use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, Semaphore};
 use tokio::task::JoinSet;
-use url::Url;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
@@ -151,7 +142,7 @@ impl DownloadManager {
             .iter()
             .map(|img| img.path.clone())
             .collect();
-        let image_token_data_data = bili_client.get_image_token(&urls, true).await?;
+        let image_token_data_data = bili_client.get_image_token(&urls).await?;
 
         let temp_download_dir = get_ep_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
@@ -313,9 +304,7 @@ impl DownloadManager {
 
         let http_client = create_http_client();
         let bili_client = self.bili_client();
-        let image_token_data_data = bili_client
-            .get_image_token(&album_plus_item.pic, false)
-            .await?;
+        let image_token_data_data = bili_client.get_image_token(&album_plus_item.pic).await?;
 
         let temp_download_dir = get_album_plus_temp_download_dir(&self.app, &album_plus_item);
         std::fs::create_dir_all(&temp_download_dir)
@@ -421,26 +410,6 @@ impl DownloadManager {
             }
         };
         drop(permit);
-        let parsed_url = match Url::parse(&url).map_err(anyhow::Error::from) {
-            Ok(parsed_url) => parsed_url,
-            Err(err) => {
-                let err = err.context(format!("解析图片链接 {url} 失败"));
-                emit_error_event(&self.app, id, url, err.to_string_chain());
-                return;
-            }
-        };
-        // 如果 parsed_url 里能找到cpx参数，则解密图片数据，否则用原始数据
-        let image_data = match parsed_url.query_pairs().find(|(key, _)| key == "cpx") {
-            Some((_, cpx)) => match decrypt_img_data(image_data, &cpx) {
-                Ok(data) => data,
-                Err(err) => {
-                    let err = err.context(format!("解密图片 {url} 失败"));
-                    emit_error_event(&self.app, id, url, err.to_string_chain());
-                    return;
-                }
-            },
-            None => image_data,
-        };
         // 保存图片
         if let Err(err) = std::fs::write(&save_path, &image_data).map_err(anyhow::Error::from) {
             let err = err.context(format!("保存图片 {save_path:?} 失败"));
@@ -555,65 +524,4 @@ fn create_http_client() -> ClientWithMiddleware {
     reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build()
-}
-
-fn aes_cbc_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Vec<u8> {
-    const BLOCK_SIZE: usize = 16;
-    let cipher = Aes256::new(GenericArray::from_slice(key));
-    // 存储解密后的数据
-    let mut decrypted_data_with_padding = Vec::with_capacity(encrypted_data.len());
-    // 将IV作为初始化块处理，解密时与第一个加密块进行异或
-    let mut previous_block: GenericArray<u8, U16> = *GenericArray::from_slice(iv);
-    // 逐块解密
-    for chunk in encrypted_data.chunks(BLOCK_SIZE) {
-        let mut block = GenericArray::clone_from_slice(chunk);
-        cipher.decrypt_block(&mut block);
-        // 与前一个块进行异或操作
-        for i in 0..BLOCK_SIZE {
-            block[i] ^= previous_block[i]; // 与前一个块进行异或
-        }
-        // 将解密后的数据追加到解密结果
-        decrypted_data_with_padding.extend_from_slice(&block);
-        // 将当前块的密文作为下一个块的IV
-        previous_block = GenericArray::clone_from_slice(chunk);
-    }
-
-    // 去除PKCS#7填充，根据最后一个字节的值确定填充长度
-    let padding_len = decrypted_data_with_padding.last().copied().unwrap() as usize;
-    let data_len = decrypted_data_with_padding.len() - padding_len;
-    decrypted_data_with_padding[..data_len].to_vec()
-}
-
-fn decrypt_img_data(img_data: Bytes, cpx: &str) -> anyhow::Result<Bytes> {
-    // 如果数据能够被解析为图片格式，则直接返回
-    if image::guess_format(&img_data).is_ok() {
-        return Ok(img_data);
-    }
-    // 否则，解密图片数据
-    let img_flag = img_data[0];
-    if img_flag != 1 {
-        return Err(anyhow!(
-            "解密图片数据失败，预料之外的图片数据标志位: {img_flag}"
-        ));
-    }
-    let data_length = BigEndian::read_u32(&img_data[1..5]) as usize;
-    if data_length + 5 > img_data.len() {
-        return Ok(img_data);
-    };
-    // 准备解密所需的数据
-    let cpx_text = percent_decode_str(cpx).decode_utf8_lossy().to_string();
-    let cpx_char = general_purpose::STANDARD.decode(cpx_text)?;
-    let iv = &cpx_char[60..76];
-    let key = &img_data[data_length + 5..];
-    let content = &img_data[5..data_length + 5];
-    // 如果数据长度小于20496，则直接解密
-    if content.len() < 20496 {
-        let decrypted_data = aes_cbc_decrypt(content, key, iv);
-        return Ok(decrypted_data.into());
-    }
-    // 否则，先解密前20496字节，再拼接后面的数据
-    let img_head = aes_cbc_decrypt(&content[0..20496], key, iv);
-    let mut decrypted_data = img_head;
-    decrypted_data.extend_from_slice(&content[20496..]);
-    Ok(decrypted_data.into())
 }
