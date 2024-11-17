@@ -30,6 +30,8 @@ pub fn run() {
             save_config,
             generate_app_qrcode,
             get_app_qrcode_status,
+            generate_web_qrcode,
+            get_web_qrcode_status,
             search,
             get_comic,
             get_album_plus,

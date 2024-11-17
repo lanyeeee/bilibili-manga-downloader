@@ -35,6 +35,22 @@ async getAppQrcodeStatus(authCode: string) : Promise<Result<AppQrcodeStatus, Com
     else return { status: "error", error: e  as any };
 }
 },
+async generateWebQrcode() : Promise<Result<WebQrcodeData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("generate_web_qrcode") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getWebQrcodeStatus(qrcodeKey: string) : Promise<Result<WebQrcodeStatusRespData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_web_qrcode_status", { qrcodeKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async search(keyword: string, pageNum: number) : Promise<Result<SearchRespData, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("search", { keyword, pageNum }) };
@@ -185,6 +201,8 @@ export type TokenInfoRespData = { mid: number; access_token: string; refresh_tok
 export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
 export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
 export type UserProfileRespData = { face: string; name: string }
+export type WebQrcodeData = { base64: string; qrcodeKey: string }
+export type WebQrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/

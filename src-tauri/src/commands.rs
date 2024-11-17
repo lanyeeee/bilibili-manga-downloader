@@ -9,8 +9,10 @@ use crate::bili_client::BiliClient;
 use crate::config::Config;
 use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
-use crate::responses::{SearchRespData, UserProfileRespData};
-use crate::types::{AlbumPlus, AlbumPlusItem, AppQrcodeData, AppQrcodeStatus, Comic, EpisodeInfo};
+use crate::responses::{SearchRespData, UserProfileRespData, WebQrcodeStatusRespData};
+use crate::types::{
+    AlbumPlus, AlbumPlusItem, AppQrcodeData, AppQrcodeStatus, Comic, EpisodeInfo, WebQrcodeData,
+};
 
 #[tauri::command]
 #[specta::specta]
@@ -55,7 +57,9 @@ pub fn save_config(
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn generate_app_qrcode(bili_client: State<'_, BiliClient>) -> CommandResult<AppQrcodeData> {
+pub async fn generate_app_qrcode(
+    bili_client: State<'_, BiliClient>,
+) -> CommandResult<AppQrcodeData> {
     let app_qrcode_data = bili_client.generate_app_qrcode().await?;
     Ok(app_qrcode_data)
 }
@@ -68,6 +72,25 @@ pub async fn get_app_qrcode_status(
 ) -> CommandResult<AppQrcodeStatus> {
     let app_qrcode_status = bili_client.get_app_qrcode_status(auth_code).await?;
     Ok(app_qrcode_status)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn generate_web_qrcode(
+    bili_client: State<'_, BiliClient>,
+) -> CommandResult<WebQrcodeData> {
+    let web_qrcode_data = bili_client.generate_web_qrcode().await?;
+    Ok(web_qrcode_data)
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn get_web_qrcode_status(
+    bili_client: State<'_, BiliClient>,
+    qrcode_key: String,
+) -> CommandResult<WebQrcodeStatusRespData> {
+    let web_qrcode_status = bili_client.get_web_qrcode_status(&qrcode_key).await?;
+    Ok(web_qrcode_status)
 }
 
 #[tauri::command(async)]

@@ -3,8 +3,8 @@ use specta::Type;
 
 #[derive(Default, Debug, Clone, PartialEq, Deserialize, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct AppQrcodeData {
+pub struct WebQrcodeData {
     pub base64: String,
-    #[serde(rename = "auth_code")]
-    pub auth_code: String,
+    #[serde(rename = "qrcodeKey")]
+    pub qrcode_key: String,
 }
