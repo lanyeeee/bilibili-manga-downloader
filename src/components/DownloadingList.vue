@@ -18,7 +18,7 @@ const notification = useNotification();
 const config = defineModel<Config>("config", {required: true});
 
 const progresses = ref<Map<number, ProgressData>>(new Map());
-const overallProgress = ref<ProgressData>({title: "总进度", current: 0, total: 0, percentage: 0, indicator: ""});
+const downloadSpeed = ref<string>("");
 
 onMounted(async () => {
   await events.downloadPendingEvent.listen(({payload}) => {
@@ -74,15 +74,8 @@ onMounted(async () => {
     progresses.value.delete(payload.id);
   });
 
-  await events.updateOverallDownloadProgressEvent.listen(({payload}) => {
-    overallProgress.value.percentage = payload.percentage;
-    overallProgress.value.current = payload.downloadedImageCount;
-    overallProgress.value.total = payload.totalImageCount;
-    console.log(payload);
-  });
-
   await events.downloadSpeedEvent.listen(({payload}) => {
-    overallProgress.value.indicator = payload.speed;
+    downloadSpeed.value = payload.speed;
   });
 });
 
@@ -124,13 +117,7 @@ async function selectDownloadDir() {
       <n-radio value="Zip">zip</n-radio>
       <n-radio value="Cbz">cbz</n-radio>
     </n-radio-group>
-    <div class="grid grid-cols-[1fr_4fr_2fr]">
-      <span class="text-ellipsis whitespace-nowrap overflow-hidden">{{ overallProgress.title }}</span>
-      <n-progress :percentage="overallProgress.percentage" indicator-placement="inside" :height="21">
-        {{ overallProgress.indicator }}
-      </n-progress>
-      <span>{{ overallProgress.current }}/{{ overallProgress.total }}</span>
-    </div>
+    <span>下载速度：{{ downloadSpeed }}</span>
     <div class="flex-1 overflow-auto">
       <div class="grid grid-cols-[2fr_4fr_1fr]"
            v-for="[epId, {title, percentage, indicator}] in progresses"

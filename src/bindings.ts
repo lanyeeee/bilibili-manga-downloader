@@ -130,8 +130,7 @@ downloadStartEvent: DownloadStartEvent,
 removeWatermarkEndEvent: RemoveWatermarkEndEvent,
 removeWatermarkErrorEvent: RemoveWatermarkErrorEvent,
 removeWatermarkStartEvent: RemoveWatermarkStartEvent,
-removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent,
-updateOverallDownloadProgressEvent: UpdateOverallDownloadProgressEvent
+removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent
 }>({
 downloadEndEvent: "download-end-event",
 downloadImageErrorEvent: "download-image-error-event",
@@ -142,8 +141,7 @@ downloadStartEvent: "download-start-event",
 removeWatermarkEndEvent: "remove-watermark-end-event",
 removeWatermarkErrorEvent: "remove-watermark-error-event",
 removeWatermarkStartEvent: "remove-watermark-start-event",
-removeWatermarkSuccessEvent: "remove-watermark-success-event",
-updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
+removeWatermarkSuccessEvent: "remove-watermark-success-event"
 })
 
 /** user-defined constants **/
@@ -207,8 +205,6 @@ export type Styles2 = { id: number; name: string }
 export type Tag = { id: number; name: string }
 export type TagRespData = { id: number; name: string }
 export type TokenInfoRespData = { mid: number; access_token: string; refresh_token: string; expires_in: number }
-export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
-export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
 export type UserProfileRespData = { face: string; name: string }
 export type WebQrcodeData = { base64: string; qrcodeKey: string }
 export type WebQrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }

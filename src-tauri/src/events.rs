@@ -8,7 +8,7 @@ pub mod prelude {
     pub use crate::events::{
         DownloadEndEvent, DownloadImageErrorEvent, DownloadImageSuccessEvent, DownloadPendingEvent,
         DownloadSpeedEvent, DownloadStartEvent, RemoveWatermarkEndEvent, RemoveWatermarkErrorEvent,
-        RemoveWatermarkStartEvent, RemoveWatermarkSuccessEvent, UpdateOverallDownloadProgressEvent,
+        RemoveWatermarkStartEvent, RemoveWatermarkSuccessEvent,
     };
 }
 
@@ -96,16 +96,6 @@ pub struct DownloadEndEventPayload {
 }
 #[derive(Serialize, Deserialize, Clone, Type, Event)]
 pub struct DownloadEndEvent(pub DownloadEndEventPayload);
-
-#[derive(Serialize, Deserialize, Clone, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateOverallDownloadProgressEventPayload {
-    pub downloaded_image_count: u32,
-    pub total_image_count: u32,
-    pub percentage: f64,
-}
-#[derive(Serialize, Deserialize, Clone, Type, Event)]
-pub struct UpdateOverallDownloadProgressEvent(pub UpdateOverallDownloadProgressEventPayload);
 
 #[derive(Serialize, Deserialize, Clone, Type)]
 #[serde(rename_all = "camelCase")]
