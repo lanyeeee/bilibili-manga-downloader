@@ -51,7 +51,6 @@ pub fn run() {
             DownloadImageSuccessEvent,
             DownloadImageErrorEvent,
             DownloadEndEvent,
-            UpdateOverallDownloadProgressEvent,
             DownloadSpeedEvent,
         ]);
 
@@ -85,7 +84,7 @@ pub fn run() {
             let config = RwLock::new(Config::new(app.handle())?);
             app.manage(config);
 
-            let download_manager = RwLock::new(DownloadManager::new(app.handle()));
+            let download_manager = DownloadManager::new(app.handle());
             app.manage(download_manager);
 
             let bili_client = bili_client::BiliClient::new(app.handle().clone());

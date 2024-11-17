@@ -18,7 +18,7 @@ const notification = useNotification();
 const config = defineModel<Config>("config", {required: true});
 
 const progresses = ref<Map<number, ProgressData>>(new Map());
-const overallProgress = ref<ProgressData>({title: "总进度", current: 0, total: 0, percentage: 0, indicator: ""});
+const downloadSpeed = ref<string>("");
 
 onMounted(async () => {
   await events.downloadPendingEvent.listen(({payload}) => {
@@ -74,15 +74,8 @@ onMounted(async () => {
     progresses.value.delete(payload.id);
   });
 
-  await events.updateOverallDownloadProgressEvent.listen(({payload}) => {
-    overallProgress.value.percentage = payload.percentage;
-    overallProgress.value.current = payload.downloadedImageCount;
-    overallProgress.value.total = payload.totalImageCount;
-    console.log(payload);
-  });
-
   await events.downloadSpeedEvent.listen(({payload}) => {
-    overallProgress.value.indicator = payload.speed;
+    downloadSpeed.value = payload.speed;
   });
 });
 
@@ -124,50 +117,7 @@ async function selectDownloadDir() {
       <n-radio value="Zip">zip</n-radio>
       <n-radio value="Cbz">cbz</n-radio>
     </n-radio-group>
-    <div class="grid grid-cols-[1fr_1fr_2fr]">
-      <n-tooltip placement="bottom" trigger="hover">
-        最多同时有多少个进度条正在下载
-        <template #trigger>
-          <n-input-number v-model:value="config.episodeConcurrency"
-                          placeholder=""
-                          :min="1"
-                          :show-button="false"
-                          :parse="(x:string) => parseInt(x)"
-                          size="tiny">
-            <template #prefix>章节并发数:</template>
-          </n-input-number>
-        </template>
-      </n-tooltip>
-      <n-tooltip placement="bottom" trigger="hover">
-        所有正在下载的进度条总共能同时下载的图片数量
-        <template #trigger>
-          <n-input-number v-model:value="config.imageConcurrency"
-                          placeholder=""
-                          :min="1"
-                          :show-button="false"
-                          :parse="(x:string) => parseInt(x)"
-                          size="tiny">
-            <template #prefix>图片并发数:</template>
-          </n-input-number>
-        </template>
-      </n-tooltip>
-      <n-input-number v-model:value="config.episodeDownloadInterval"
-                      placeholder=""
-                      :min="0"
-                      :show-button="false"
-                      :parse="(x:string) => parseInt(x)"
-                      size="tiny">
-        <template #prefix>每个章节下载完成后休息:</template>
-        <template #suffix>秒</template>
-      </n-input-number>
-    </div>
-    <div class="grid grid-cols-[1fr_4fr_2fr]">
-      <span class="text-ellipsis whitespace-nowrap overflow-hidden">{{ overallProgress.title }}</span>
-      <n-progress :percentage="overallProgress.percentage" indicator-placement="inside" :height="21">
-        {{ overallProgress.indicator }}
-      </n-progress>
-      <span>{{ overallProgress.current }}/{{ overallProgress.total }}</span>
-    </div>
+    <span>下载速度：{{ downloadSpeed }}</span>
     <div class="flex-1 overflow-auto">
       <div class="grid grid-cols-[2fr_4fr_1fr]"
            v-for="[epId, {title, percentage, indicator}] in progresses"

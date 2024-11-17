@@ -144,7 +144,7 @@ async function handleWebQrcodeStatus(webQrcodeStatus: WebQrcodeStatusRespData, a
   if (!confirmed) {
     return;
   }
-  // 用Web端的SESSDATA确认App端的二维码成功，轮询App端的二维码状态，以获取access_token
+  // 用Web端的SESSDATA和csrf确认App端的二维码成功，轮询App端的二维码状态，以获取access_token
   qrcodeStatusMessage.value = "正在获取access_token";
   while (showing.value) {
     const appQrcodeStatus = await getAppQrcodeStatus(appQrcodeData);
@@ -152,13 +152,13 @@ async function handleWebQrcodeStatus(webQrcodeStatus: WebQrcodeStatusRespData, a
       return;
     }
 
-    await handleAppQrcodeStatus(appQrcodeStatus, sessdata);
+    await handleAppQrcodeStatus(appQrcodeStatus);
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
 }
 
-async function handleAppQrcodeStatus(appQrcodeStatus: AppQrcodeStatus, sessdata: string) {
+async function handleAppQrcodeStatus(appQrcodeStatus: AppQrcodeStatus) {
   const code = appQrcodeStatus.code;
   if (![0, 86038, 86039, 86090].includes(code)) {
     notification.error({
@@ -171,9 +171,8 @@ async function handleAppQrcodeStatus(appQrcodeStatus: AppQrcodeStatus, sessdata:
   if (code !== 0) {
     return;
   }
-  // 登录成功，把access_token和SESSDATA保存到config中
+  // 登录成功，把access_token保存到config中
   config.value.accessToken = appQrcodeStatus.access_token;
-  config.value.sessdata = sessdata;
   showing.value = false;
   message.success("登录成功");
 }

@@ -34,24 +34,10 @@ pub fn get_config(config: State<RwLock<Config>>) -> Config {
 #[allow(clippy::needless_pass_by_value)]
 pub fn save_config(
     app: AppHandle,
-    download_manager: State<RwLock<DownloadManager>>,
     config_state: State<RwLock<Config>>,
     config: Config,
 ) -> CommandResult<()> {
     let mut config_state = config_state.write();
-
-    if config_state.episode_concurrency != config.episode_concurrency {
-        download_manager
-            .write()
-            .set_episode_concurrency(config.episode_concurrency);
-    }
-
-    if config_state.image_concurrency != config.image_concurrency {
-        download_manager
-            .write()
-            .set_image_concurrency(config.image_concurrency);
-    }
-
     *config_state = config;
     config_state.save(&app)?;
     Ok(())
@@ -149,10 +135,9 @@ pub async fn get_album_plus(
 #[tauri::command(async)]
 #[specta::specta]
 pub async fn download_episodes(
-    download_manager: State<'_, RwLock<DownloadManager>>,
+    download_manager: State<'_, DownloadManager>,
     episodes: Vec<EpisodeInfo>,
 ) -> CommandResult<()> {
-    let download_manager = download_manager.read().clone();
     for ep in episodes {
         download_manager.submit_episode(ep).await?;
     }
@@ -162,10 +147,9 @@ pub async fn download_episodes(
 #[tauri::command(async)]
 #[specta::specta]
 pub async fn download_album_plus_items(
-    download_manager: State<'_, RwLock<DownloadManager>>,
+    download_manager: State<'_, DownloadManager>,
     items: Vec<AlbumPlusItem>,
 ) -> CommandResult<()> {
-    let download_manager = download_manager.read().clone();
     for item in items {
         download_manager.submit_album_plus(item).await?;
     }
