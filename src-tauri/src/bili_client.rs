@@ -447,17 +447,18 @@ impl BiliClient {
     }
 
     pub async fn get_image_index(&self, episode_id: i64) -> anyhow::Result<ImageIndexRespData> {
-        let cookie = self.cookie();
+        let access_token = self.access_token();
         let params = json!({
-            "platform": "web",
-            "device": "pc",
+            "mobi_app": "android_comic",
+            "version": "6.5.0",
+            "device": "android",
+            "access_key": access_token,
         });
         let payload = json!({"ep_id": episode_id});
         // 发送获取ImageIndex的请求
         let http_resp = Self::client()
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
             .query(&params)
-            .header("cookie", cookie)
             .json(&payload)
             .send()
             .await?;
@@ -494,37 +495,22 @@ impl BiliClient {
         Ok(image_index_data)
     }
 
-    pub async fn get_image_token(
-        &self,
-        urls: &Vec<String>,
-        from_web_api: bool,
-    ) -> anyhow::Result<ImageTokenRespData> {
-        let url = "https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken";
+    pub async fn get_image_token(&self, urls: &Vec<String>) -> anyhow::Result<ImageTokenRespData> {
+        let access_token = self.access_token();
+        let params = json!({
+            "mobi_app": "android_comic",
+            "version": "6.5.0",
+            "access_key": access_token,
+        });
         let urls_str = serde_json::to_string(urls)?;
         let payload = json!({"urls": urls_str});
-        // 构造获取ImageToken的请求
-        let http_req = if from_web_api {
-            let cookie = self.cookie();
-            let params = json!({
-                "platform": "web",
-                "device": "pc",
-            });
-            Self::client()
-                .post(url)
-                .query(&params)
-                .header("cookie", cookie)
-                .json(&payload)
-        } else {
-            let access_token = self.access_token();
-            let params = json!({
-                "mobi_app": "android_comic",
-                "version": "6.5.0",
-                "access_key": access_token,
-            });
-            Self::client().post(url).query(&params).json(&payload)
-        };
         // 发送获取ImageToken的请求
-        let http_resp = http_req.send().await?;
+        let http_resp = Self::client()
+            .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken")
+            .query(&params)
+            .json(&payload)
+            .send()
+            .await?;
         // 检查http响应状态码
         let status = http_resp.status();
         let body = http_resp.text().await?;
