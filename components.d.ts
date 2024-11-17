@@ -19,7 +19,6 @@ declare module 'vue' {
     NDropdown: typeof import('naive-ui')['NDropdown']
     NEmpty: typeof import('naive-ui')['NEmpty']
     NInput: typeof import('naive-ui')['NInput']
-    NInputNumber: typeof import('naive-ui')['NInputNumber']
     NMessageProvider: typeof import('naive-ui')['NMessageProvider']
     NModal: typeof import('naive-ui')['NModal']
     NModalProvider: typeof import('naive-ui')['NModalProvider']
@@ -29,7 +28,6 @@ declare module 'vue' {
     NRadioGroup: typeof import('naive-ui')['NRadioGroup']
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']
-    NTooltip: typeof import('naive-ui')['NTooltip']
     QrcodeViewer: typeof import('./src/components/QrcodeViewer.vue')['default']
     SearchPane: typeof import('./src/components/SearchPane.vue')['default']
   }
