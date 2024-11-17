@@ -51,6 +51,14 @@ async getWebQrcodeStatus(qrcodeKey: string) : Promise<Result<WebQrcodeStatusResp
     else return { status: "error", error: e  as any };
 }
 },
+async confirmAppQrcode(authCode: string, sessdata: string, csrf: string) : Promise<Result<ConfirmAppQrcodeRespData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("confirm_app_qrcode", { authCode, sessdata, csrf }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async search(keyword: string, pageNum: number) : Promise<Result<SearchRespData, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("search", { keyword, pageNum }) };
@@ -159,6 +167,7 @@ export type ComicInSearchRespData = { id: number; title: string; square_cover: s
 export type ComicInfo = { manga: string; series: string; publisher: string; writer: string; genre: string; summary: string; count: number; title: string; number: string; pageCount: number; year: number; month: number; day: number }
 export type CommandError = string
 export type Config = { accessToken: string; sessdata: string; downloadDir: string; archiveFormat: ArchiveFormat; episodeConcurrency: number; imageConcurrency: number; episodeDownloadInterval: number }
+export type ConfirmAppQrcodeRespData = { code: number; msg?: string }
 export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
 export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
 export type DataInfo = { read_score: ReadScore; interactive_value: InteractiveValue }
