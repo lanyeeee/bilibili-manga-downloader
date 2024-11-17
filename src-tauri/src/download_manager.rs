@@ -89,8 +89,7 @@ impl DownloadManager {
 
         loop {
             interval.tick().await;
-            let manager = app.state::<RwLock<DownloadManager>>();
-            let manager = manager.read();
+            let manager = app.state::<DownloadManager>();
             let byte_per_sec = manager.byte_per_sec.swap(0, Ordering::Relaxed);
             let mega_byte_per_sec = byte_per_sec as f64 / 1024.0 / 1024.0;
             let speed = format!("{mega_byte_per_sec:.2} MB/s");
@@ -100,7 +99,7 @@ impl DownloadManager {
 
     async fn receiver_loop(app: AppHandle, mut receiver: Receiver<DownloadPayload>) {
         while let Some(payload) = receiver.recv().await {
-            let manager = app.state::<RwLock<DownloadManager>>().read().clone();
+            let manager = app.state::<DownloadManager>().inner().clone();
             match payload {
                 DownloadPayload::Episode(ep_info) => {
                     tauri::async_runtime::spawn(manager.process_episode(ep_info));
