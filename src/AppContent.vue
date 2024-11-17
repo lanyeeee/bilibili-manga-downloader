@@ -8,12 +8,14 @@ import SearchPane from "./components/SearchPane.vue";
 import EpisodePane from "./components/EpisodePane.vue";
 import {appDataDir} from "@tauri-apps/api/path";
 import {path} from "@tauri-apps/api";
+import CookieLoginDialog from "./components/CookieLoginDialog.vue";
 
 const notification = useNotification();
 const message = useMessage();
 
 const config = ref<Config>();
 const qrcodeViewerShowing = ref<boolean>(false);
+const cookieLoginDialogShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
 const selectedComic = ref<Comic>();
 const userProfile = ref<UserProfileRespData>();
@@ -64,19 +66,11 @@ async function showConfigInFileManager() {
 }
 
 async function test() {
-  const generateResult = await commands.generateWebQrcode();
-  if (generateResult.status === "error") {
-    notification.error({title: "生成二维码失败", description: generateResult.error});
-    return;
-  }
-  console.log(generateResult);
-
-  const statusResult = await commands.getWebQrcodeStatus(generateResult.data.qrcodeKey);
-  if (statusResult.status === "error") {
-    notification.error({title: "获取二维码状态失败", description: statusResult.error});
-    return;
-  }
-  console.log(statusResult);
+  notification.error({
+    title: "标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 ",
+    description: "描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 ",
+    content: "内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 ",
+  });
 
 }
 
@@ -98,6 +92,7 @@ async function test() {
       <div class="basis-1/2 flex flex-col overflow-hidden">
         <div class="flex">
           <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
+          <n-button @click="cookieLoginDialogShowing=true" type="primary" secondary>Cookie登录</n-button>
           <n-button @click="showConfigInFileManager">打开配置目录</n-button>
           <n-button @click="test">测试用</n-button>
           <div v-if="userProfile!==undefined" class="flex flex-justify-end">
@@ -114,5 +109,8 @@ async function test() {
   </div>
   <n-modal preset="dialog" title="请使用BiliBili手机客户端扫描二维码登录" v-model:show="qrcodeViewerShowing">
     <qrcode-viewer v-if="config!==undefined" v-model:showing="qrcodeViewerShowing" v-model:config="config"/>
+  </n-modal>
+  <n-modal v-model:show="cookieLoginDialogShowing">
+    <cookie-login-dialog v-if="config!==undefined" v-model:showing="cookieLoginDialogShowing" v-model:config="config"/>
   </n-modal>
 </template>
