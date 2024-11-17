@@ -4,6 +4,8 @@ import {onMounted, ref} from "vue";
 import {commands, Config, events} from "../bindings.ts";
 import {NProgress, useNotification} from "naive-ui";
 import {open} from "@tauri-apps/plugin-dialog";
+import {path} from "@tauri-apps/api";
+import {appDataDir} from "@tauri-apps/api/path";
 
 type ProgressData = {
   title: string;
@@ -89,6 +91,15 @@ async function showDownloadDirInFileManager() {
   }
 }
 
+async function showConfigInFileManager() {
+  const configName = "config.json";
+  const configPath = await path.join(await appDataDir(), configName);
+  const result = await commands.showPathInFileManager(configPath);
+  if (result.status === "error") {
+    notification.error({title: "打开配置文件失败", description: result.error});
+  }
+}
+
 async function selectDownloadDir() {
   const selectedDirPath = await open({directory: true});
   if (selectedDirPath === null) {
@@ -109,7 +120,8 @@ async function selectDownloadDir() {
                @click="selectDownloadDir">
         <template #prefix>下载目录：</template>
       </n-input>
-      <n-button size="tiny" @click="showDownloadDirInFileManager">打开下载目录</n-button>
+      <n-button size="tiny" @click="showDownloadDirInFileManager">下载目录</n-button>
+      <n-button size="tiny" @click="showConfigInFileManager">配置目录</n-button>
     </div>
     <n-radio-group v-model:value="config.archiveFormat">
       下载格式：
