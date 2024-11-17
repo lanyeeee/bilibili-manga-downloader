@@ -130,8 +130,7 @@ downloadStartEvent: DownloadStartEvent,
 removeWatermarkEndEvent: RemoveWatermarkEndEvent,
 removeWatermarkErrorEvent: RemoveWatermarkErrorEvent,
 removeWatermarkStartEvent: RemoveWatermarkStartEvent,
-removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent,
-updateOverallDownloadProgressEvent: UpdateOverallDownloadProgressEvent
+removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent
 }>({
 downloadEndEvent: "download-end-event",
 downloadImageErrorEvent: "download-image-error-event",
@@ -142,8 +141,7 @@ downloadStartEvent: "download-start-event",
 removeWatermarkEndEvent: "remove-watermark-end-event",
 removeWatermarkErrorEvent: "remove-watermark-error-event",
 removeWatermarkStartEvent: "remove-watermark-start-event",
-removeWatermarkSuccessEvent: "remove-watermark-success-event",
-updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
+removeWatermarkSuccessEvent: "remove-watermark-success-event"
 })
 
 /** user-defined constants **/
@@ -166,7 +164,7 @@ export type Comic = { id: number; title: string; comic_type: number; page_defaul
 export type ComicInSearchRespData = { id: number; title: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData }
 export type ComicInfo = { manga: string; series: string; publisher: string; writer: string; genre: string; summary: string; count: number; title: string; number: string; pageCount: number; year: number; month: number; day: number }
 export type CommandError = string
-export type Config = { accessToken: string; sessdata: string; downloadDir: string; archiveFormat: ArchiveFormat; episodeConcurrency: number; imageConcurrency: number; episodeDownloadInterval: number }
+export type Config = { accessToken: string; downloadDir: string; archiveFormat: ArchiveFormat }
 export type ConfirmAppQrcodeRespData = { code: number; msg?: string }
 export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
 export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
@@ -207,8 +205,6 @@ export type Styles2 = { id: number; name: string }
 export type Tag = { id: number; name: string }
 export type TagRespData = { id: number; name: string }
 export type TokenInfoRespData = { mid: number; access_token: string; refresh_token: string; expires_in: number }
-export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
-export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
 export type UserProfileRespData = { face: string; name: string }
 export type WebQrcodeData = { base64: string; qrcodeKey: string }
 export type WebQrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
