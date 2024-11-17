@@ -8,6 +8,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ComicCard: typeof import('./src/components/ComicCard.vue')['default']
+    CookieLoginDialog: typeof import('./src/components/CookieLoginDialog.vue')['default']
     DownloadingList: typeof import('./src/components/DownloadingList.vue')['default']
     EpisodePane: typeof import('./src/components/EpisodePane.vue')['default']
     NAvatar: typeof import('naive-ui')['NAvatar']
@@ -15,6 +16,7 @@ declare module 'vue' {
     NCard: typeof import('naive-ui')['NCard']
     NCheckbox: typeof import('naive-ui')['NCheckbox']
     NCheckboxGroup: typeof import('naive-ui')['NCheckboxGroup']
+    NDialog: typeof import('naive-ui')['NDialog']
     NDivider: typeof import('naive-ui')['NDivider']
     NDropdown: typeof import('naive-ui')['NDropdown']
     NEmpty: typeof import('naive-ui')['NEmpty']
