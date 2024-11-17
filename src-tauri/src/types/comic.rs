@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::config::Config;
 use crate::responses::{ComicRespData, EpisodeRespData};
 use crate::types::AlbumPlus;
@@ -153,6 +155,8 @@ pub struct Comic {
     pub album_plus: AlbumPlus,
 }
 impl Comic {
+    #[allow(clippy::too_many_lines)]
+    // TODO: 统一用from实现，以减少代码行数
     pub fn from(app: &AppHandle, comic: ComicRespData, album_plus: AlbumPlus) -> Self {
         let comic_title = filename_filter(&comic.title);
         let mut episode_infos: Vec<EpisodeInfo> = comic
@@ -198,6 +202,27 @@ impl Comic {
                 Some(episode_info)
             })
             .collect();
+        // 解决章节标题重复的问题
+        let mut ep_title_count = HashMap::new();
+        // 统计章节标题出现的次数
+        for ep in &episode_infos {
+            let Some(count) = ep_title_count.get_mut(&ep.episode_title) else {
+                ep_title_count.insert(ep.episode_title.clone(), 1);
+                continue;
+            };
+            *count += 1;
+        }
+        // 只保留重复的章节标题
+        ep_title_count.retain(|_, v| *v > 1);
+        // 为重复的章节标题添加序号
+        for ep in &mut episode_infos {
+            let Some(count) = ep_title_count.get_mut(&ep.episode_title) else {
+                continue;
+            };
+            ep.episode_title = format!("{}-{}", ep.episode_title, count);
+            *count -= 1;
+        }
+
         episode_infos.reverse();
 
         let styles2 = comic

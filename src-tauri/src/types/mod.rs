@@ -1,11 +1,13 @@
 mod album_plus;
+mod app_qrcode_data;
+mod app_qrcode_status;
 mod archive_format;
 mod comic;
-mod qrcode_data;
-mod qrcode_status;
+mod web_qrcode_data;
 
 pub use album_plus::*;
+pub use app_qrcode_data::*;
+pub use app_qrcode_status::*;
 pub use archive_format::*;
 pub use comic::*;
-pub use qrcode_data::*;
-pub use qrcode_status::*;
+pub use web_qrcode_data::*;
