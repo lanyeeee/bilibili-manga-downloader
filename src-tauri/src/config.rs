@@ -10,7 +10,6 @@ use tauri::{AppHandle, Manager};
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     pub access_token: String,
-    pub sessdata: String,
     pub download_dir: PathBuf,
     pub archive_format: ArchiveFormat,
     pub episode_concurrency: usize,
@@ -25,7 +24,6 @@ impl Config {
         // TODO: 实现Default trait以替代这种写法
         let default_config = Config {
             access_token: String::new(),
-            sessdata: String::new(),
             download_dir: app_data_dir.join("漫画下载"),
             archive_format: ArchiveFormat::default(),
             episode_concurrency: 4,
@@ -49,9 +47,5 @@ impl Config {
         let config_string = serde_json::to_string_pretty(self)?;
         std::fs::write(config_path, config_string)?;
         Ok(())
-    }
-
-    pub fn get_cookie(&self) -> String {
-        format!("SESSDATA={}", self.sessdata)
     }
 }

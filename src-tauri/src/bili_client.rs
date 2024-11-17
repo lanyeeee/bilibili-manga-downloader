@@ -547,10 +547,6 @@ impl BiliClient {
             .access_token
             .clone()
     }
-
-    fn cookie(&self) -> String {
-        self.app.state::<RwLock<Config>>().read().get_cookie()
-    }
 }
 
 fn app_sign(mut params: BTreeMap<String, String>) -> BTreeMap<String, String> {
