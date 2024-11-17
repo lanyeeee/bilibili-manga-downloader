@@ -3,7 +3,7 @@ use specta::Type;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct QrcodeStatusRespData {
+pub struct AppQrcodeStatusRespData {
     #[serde(rename = "is_new")]
     pub is_new: bool,
     pub mid: i64,

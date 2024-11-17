@@ -19,17 +19,17 @@ async saveConfig(config: Config) : Promise<Result<null, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async generateQrcode() : Promise<Result<QrcodeData, CommandError>> {
+async generateAppQrcode() : Promise<Result<AppQrcodeData, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("generate_qrcode") };
+    return { status: "ok", data: await TAURI_INVOKE("generate_app_qrcode") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async getQrcodeStatus(authCode: string) : Promise<Result<QrcodeStatus, CommandError>> {
+async getAppQrcodeStatus(authCode: string) : Promise<Result<AppQrcodeStatus, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_qrcode_status", { authCode }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_app_qrcode_status", { authCode }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -131,6 +131,8 @@ updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
 export type AlbumPlus = { list: AlbumPlusDetail[]; icon_url: string; comic_title: string; server_time: string }
 export type AlbumPlusDetail = { isLock: boolean; isDownloaded: boolean; cost: number; reward: number; item: AlbumPlusItem; unlocked_item_ids: number[] }
 export type AlbumPlusItem = { id: number; title: string; comicTitle: string; pic: string[] }
+export type AppQrcodeData = { base64: string; auth_code: string }
+export type AppQrcodeStatus = { code: number; message: string; is_new: boolean; mid: number; access_token: string; refresh_token: string; expires_in: number; token_info: TokenInfoRespData; cookie_info: CookieInfoRespData; sso: string[] }
 export type ArchiveFormat = "Image" | "Zip" | "Cbz"
 export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
@@ -161,8 +163,6 @@ export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number;
 export type Increase = { days: number; increase_percent: number }
 export type InteractiveValue = { interact_value: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type NovelInSearchRespData = { novel_id: number; title: string; v_cover: string; finish_status: number; status: number; discount_type: number; numbers: number; style: StyleRespData; evaluate: string; author: string; tag: TagRespData }
-export type QrcodeData = { base64: string; auth_code: string }
-export type QrcodeStatus = { code: number; message: string; is_new: boolean; mid: number; access_token: string; refresh_token: string; expires_in: number; token_info: TokenInfoRespData; cookie_info: CookieInfoRespData; sso: string[] }
 export type ReadScore = { read_score: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type RemoveWatermarkEndEvent = RemoveWatermarkEndEventPayload
 export type RemoveWatermarkEndEventPayload = { dirPath: string }
