@@ -1,10 +1,10 @@
-use crate::responses::{BiliResp, CookieInfoRespData, QrcodeStatusRespData, TokenInfoRespData};
+use crate::responses::{AppQrcodeStatusRespData, BiliResp, CookieInfoRespData, TokenInfoRespData};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct QrcodeStatus {
+pub struct AppQrcodeStatus {
     pub code: i64,
     pub message: String,
     #[serde(rename = "is_new")]
@@ -22,19 +22,19 @@ pub struct QrcodeStatus {
     pub cookie_info: CookieInfoRespData,
     pub sso: Vec<String>,
 }
-impl QrcodeStatus {
-    pub fn from(bili_resp: BiliResp, qrcode_status_resp_data: QrcodeStatusRespData) -> Self {
+impl AppQrcodeStatus {
+    pub fn from(bili_resp: BiliResp, app_qrcode_status_resp_data: AppQrcodeStatusRespData) -> Self {
         Self {
             code: bili_resp.code,
             message: bili_resp.msg,
-            is_new: qrcode_status_resp_data.is_new,
-            mid: qrcode_status_resp_data.mid,
-            access_token: qrcode_status_resp_data.access_token,
-            refresh_token: qrcode_status_resp_data.refresh_token,
-            expires_in: qrcode_status_resp_data.expires_in,
-            token_info: qrcode_status_resp_data.token_info,
-            cookie_info: qrcode_status_resp_data.cookie_info,
-            sso: qrcode_status_resp_data.sso,
+            is_new: app_qrcode_status_resp_data.is_new,
+            mid: app_qrcode_status_resp_data.mid,
+            access_token: app_qrcode_status_resp_data.access_token,
+            refresh_token: app_qrcode_status_resp_data.refresh_token,
+            expires_in: app_qrcode_status_resp_data.expires_in,
+            token_info: app_qrcode_status_resp_data.token_info,
+            cookie_info: app_qrcode_status_resp_data.cookie_info,
+            sso: app_qrcode_status_resp_data.sso,
         }
     }
 }

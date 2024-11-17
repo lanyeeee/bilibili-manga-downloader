@@ -15,10 +15,10 @@ use url::form_urlencoded;
 
 use crate::config::Config;
 use crate::responses::{
-    AlbumPlusRespData, BiliResp, ComicRespData, GenerateQrcodeRespData, ImageIndexRespData,
-    ImageTokenRespData, QrcodeStatusRespData, SearchRespData, UserProfileRespData,
+    AlbumPlusRespData, AppQrcodeStatusRespData, BiliResp, ComicRespData, GenerateAppQrcodeRespData,
+    ImageIndexRespData, ImageTokenRespData, SearchRespData, UserProfileRespData,
 };
-use crate::types::{AlbumPlus, Comic, QrcodeData, QrcodeStatus};
+use crate::types::{AlbumPlus, AppQrcodeData, AppQrcodeStatus, Comic};
 
 const APP_KEY: &str = "cc8617fd6961e070";
 const APP_SEC: &str = "3131924b941aac971e45189f265262be";
@@ -41,7 +41,7 @@ impl BiliClient {
             .unwrap()
     }
 
-    pub async fn generate_qrcode(&self) -> anyhow::Result<QrcodeData> {
+    pub async fn generate_app_qrcode(&self) -> anyhow::Result<AppQrcodeData> {
         let params = BTreeMap::from([
             ("ts".to_string(), "0".to_string()),
             ("local_id".to_string(), "0".to_string()),
@@ -72,29 +72,32 @@ impl BiliClient {
         let Some(data) = bili_resp.data else {
             return Err(anyhow!("生成二维码失败，data字段不存在: {bili_resp:?}"));
         };
-        // 尝试将data解析为GenerateQrcodeRespData
+        // 尝试将data解析为GenerateAppQrcodeRespData
         let data_str = data.to_string();
-        let generate_qrcode_resp_data = serde_json::from_str::<GenerateQrcodeRespData>(&data_str)
-            .context(format!(
-            "生成二维码失败，将data解析为GenerateQrcodeRespData失败: {data_str}"
-        ))?;
+        let generate_app_qrcode_resp_data =
+            serde_json::from_str::<GenerateAppQrcodeRespData>(&data_str).context(format!(
+                "生成二维码失败，将data解析为GenerateAppQrcodeRespData失败: {data_str}"
+            ))?;
         // 生成二维码
-        let qr_code = QrCode::new(generate_qrcode_resp_data.url)
+        let qr_code = QrCode::new(generate_app_qrcode_resp_data.url)
             .context("生成二维码失败，从url创建QrCode失败")?;
         let img = qr_code.render::<Rgb<u8>>().build();
         let mut img_data: Vec<u8> = Vec::new();
         img.write_to(&mut Cursor::new(&mut img_data), image::ImageFormat::Jpeg)
             .context("生成二维码失败，将QrCode写入img_data失败")?;
         let base64 = general_purpose::STANDARD.encode(img_data);
-        let qrcode_data = QrcodeData {
+        let app_qrcode_data = AppQrcodeData {
             base64,
-            auth_code: generate_qrcode_resp_data.auth_code,
+            auth_code: generate_app_qrcode_resp_data.auth_code,
         };
 
-        Ok(qrcode_data)
+        Ok(app_qrcode_data)
     }
 
-    pub async fn get_qrcode_status(&self, auth_code: String) -> anyhow::Result<QrcodeStatus> {
+    pub async fn get_app_qrcode_status(
+        &self,
+        auth_code: String,
+    ) -> anyhow::Result<AppQrcodeStatus> {
         let params = BTreeMap::from([
             ("auth_code".to_string(), auth_code),
             ("ts".to_string(), "0".to_string()),
@@ -124,20 +127,20 @@ impl BiliClient {
         }
         // 检查BiliResp的data是否存在
         let Some(ref data) = bili_resp.data else {
-            return Ok(QrcodeStatus::from(
+            return Ok(AppQrcodeStatus::from(
                 bili_resp,
-                QrcodeStatusRespData::default(),
+                AppQrcodeStatusRespData::default(),
             ));
         };
-        // 尝试将data解析为QrcodeStatusRespData
+        // 尝试将data解析为AppQrcodeStatusRespData
         let data_str = data.to_string();
-        let qrcode_status_resp_data = serde_json::from_str::<QrcodeStatusRespData>(&data_str)
-            .context(format!(
-                "获取二维码状态失败，将data解析为QrcodeStatusRespData失败: {data_str}"
+        let app_qrcode_status_resp_data =
+            serde_json::from_str::<AppQrcodeStatusRespData>(&data_str).context(format!(
+                "获取二维码状态失败，将data解析为AppQrcodeStatusRespData失败: {data_str}"
             ))?;
-        let qrcode_status = QrcodeStatus::from(bili_resp, qrcode_status_resp_data);
+        let app_qrcode_status = AppQrcodeStatus::from(bili_resp, app_qrcode_status_resp_data);
 
-        Ok(qrcode_status)
+        Ok(app_qrcode_status)
     }
 
     pub async fn get_user_profile(&self) -> anyhow::Result<UserProfileRespData> {
