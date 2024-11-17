@@ -34,24 +34,10 @@ pub fn get_config(config: State<RwLock<Config>>) -> Config {
 #[allow(clippy::needless_pass_by_value)]
 pub fn save_config(
     app: AppHandle,
-    download_manager: State<RwLock<DownloadManager>>,
     config_state: State<RwLock<Config>>,
     config: Config,
 ) -> CommandResult<()> {
     let mut config_state = config_state.write();
-
-    if config_state.episode_concurrency != config.episode_concurrency {
-        download_manager
-            .write()
-            .set_episode_concurrency(config.episode_concurrency);
-    }
-
-    if config_state.image_concurrency != config.image_concurrency {
-        download_manager
-            .write()
-            .set_image_concurrency(config.image_concurrency);
-    }
-
     *config_state = config;
     config_state.save(&app)?;
     Ok(())
