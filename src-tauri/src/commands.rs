@@ -135,10 +135,9 @@ pub async fn get_album_plus(
 #[tauri::command(async)]
 #[specta::specta]
 pub async fn download_episodes(
-    download_manager: State<'_, RwLock<DownloadManager>>,
+    download_manager: State<'_, DownloadManager>,
     episodes: Vec<EpisodeInfo>,
 ) -> CommandResult<()> {
-    let download_manager = download_manager.read().clone();
     for ep in episodes {
         download_manager.submit_episode(ep).await?;
     }
@@ -148,10 +147,9 @@ pub async fn download_episodes(
 #[tauri::command(async)]
 #[specta::specta]
 pub async fn download_album_plus_items(
-    download_manager: State<'_, RwLock<DownloadManager>>,
+    download_manager: State<'_, DownloadManager>,
     items: Vec<AlbumPlusItem>,
 ) -> CommandResult<()> {
-    let download_manager = download_manager.read().clone();
     for item in items {
         download_manager.submit_album_plus(item).await?;
     }
