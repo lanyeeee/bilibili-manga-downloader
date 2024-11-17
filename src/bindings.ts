@@ -19,17 +19,41 @@ async saveConfig(config: Config) : Promise<Result<null, CommandError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async generateQrcode() : Promise<Result<QrcodeData, CommandError>> {
+async generateAppQrcode() : Promise<Result<AppQrcodeData, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("generate_qrcode") };
+    return { status: "ok", data: await TAURI_INVOKE("generate_app_qrcode") };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
 },
-async getQrcodeStatus(authCode: string) : Promise<Result<QrcodeStatus, CommandError>> {
+async getAppQrcodeStatus(authCode: string) : Promise<Result<AppQrcodeStatus, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_qrcode_status", { authCode }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_app_qrcode_status", { authCode }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async generateWebQrcode() : Promise<Result<WebQrcodeData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("generate_web_qrcode") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getWebQrcodeStatus(qrcodeKey: string) : Promise<Result<WebQrcodeStatusRespData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_web_qrcode_status", { qrcodeKey }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async confirmAppQrcode(authCode: string, sessdata: string, csrf: string) : Promise<Result<ConfirmAppQrcodeRespData, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("confirm_app_qrcode", { authCode, sessdata, csrf }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -131,6 +155,8 @@ updateOverallDownloadProgressEvent: "update-overall-download-progress-event"
 export type AlbumPlus = { list: AlbumPlusDetail[]; icon_url: string; comic_title: string; server_time: string }
 export type AlbumPlusDetail = { isLock: boolean; isDownloaded: boolean; cost: number; reward: number; item: AlbumPlusItem; unlocked_item_ids: number[] }
 export type AlbumPlusItem = { id: number; title: string; comicTitle: string; pic: string[] }
+export type AppQrcodeData = { base64: string; auth_code: string }
+export type AppQrcodeStatus = { code: number; message: string; is_new: boolean; mid: number; access_token: string; refresh_token: string; expires_in: number; token_info: TokenInfoRespData; cookie_info: CookieInfoRespData; sso: string[] }
 export type ArchiveFormat = "Image" | "Zip" | "Cbz"
 export type Author = { id: number; name: string; cname: string }
 export type AutoPayInfo = { auto_pay_orders: AutoPayOrder[]; id: number }
@@ -141,6 +167,7 @@ export type ComicInSearchRespData = { id: number; title: string; square_cover: s
 export type ComicInfo = { manga: string; series: string; publisher: string; writer: string; genre: string; summary: string; count: number; title: string; number: string; pageCount: number; year: number; month: number; day: number }
 export type CommandError = string
 export type Config = { accessToken: string; sessdata: string; downloadDir: string; archiveFormat: ArchiveFormat; episodeConcurrency: number; imageConcurrency: number; episodeDownloadInterval: number }
+export type ConfirmAppQrcodeRespData = { code: number; msg?: string }
 export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
 export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
 export type DataInfo = { read_score: ReadScore; interactive_value: InteractiveValue }
@@ -161,8 +188,6 @@ export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number;
 export type Increase = { days: number; increase_percent: number }
 export type InteractiveValue = { interact_value: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type NovelInSearchRespData = { novel_id: number; title: string; v_cover: string; finish_status: number; status: number; discount_type: number; numbers: number; style: StyleRespData; evaluate: string; author: string; tag: TagRespData }
-export type QrcodeData = { base64: string; auth_code: string }
-export type QrcodeStatus = { code: number; message: string; is_new: boolean; mid: number; access_token: string; refresh_token: string; expires_in: number; token_info: TokenInfoRespData; cookie_info: CookieInfoRespData; sso: string[] }
 export type ReadScore = { read_score: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type RemoveWatermarkEndEvent = RemoveWatermarkEndEventPayload
 export type RemoveWatermarkEndEventPayload = { dirPath: string }
@@ -185,6 +210,8 @@ export type TokenInfoRespData = { mid: number; access_token: string; refresh_tok
 export type UpdateOverallDownloadProgressEvent = UpdateOverallDownloadProgressEventPayload
 export type UpdateOverallDownloadProgressEventPayload = { downloadedImageCount: number; totalImageCount: number; percentage: number }
 export type UserProfileRespData = { face: string; name: string }
+export type WebQrcodeData = { base64: string; qrcodeKey: string }
+export type WebQrcodeStatusRespData = { url: string; refresh_token: string; timestamp: number; code: number; message: string }
 export type WikiRespData = { id: number; title: string; origin_title: string; vertical_cover: string; producer: string; author_name: string[]; publish_time: string; frequency: string }
 
 /** tauri-specta globals **/
