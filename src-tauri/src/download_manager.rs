@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -46,8 +46,6 @@ pub struct DownloadManager {
     sender: Arc<mpsc::Sender<DownloadPayload>>,
     ep_sem: Arc<Semaphore>,
     byte_per_sec: Arc<AtomicU64>,
-    downloaded_image_count: Arc<AtomicU32>,
-    total_image_count: Arc<AtomicU32>,
 }
 
 impl DownloadManager {
@@ -60,8 +58,6 @@ impl DownloadManager {
             sender: Arc::new(sender),
             ep_sem: Arc::new(Semaphore::new(5)),
             byte_per_sec: Arc::new(AtomicU64::new(0)),
-            downloaded_image_count: Arc::new(AtomicU32::new(0)),
-            total_image_count: Arc::new(AtomicU32::new(0)),
         };
 
         tauri::async_runtime::spawn(Self::log_download_speed(app.clone()));
@@ -132,8 +128,6 @@ impl DownloadManager {
             .map(|data| data.complete_url)
             .collect();
         let total = urls.len() as u32;
-        // 记录总共需要下载的图片数量
-        self.total_image_count.fetch_add(total, Ordering::Relaxed);
         let mut current = 0;
         emit_start_event(
             &self.app,
@@ -166,27 +160,11 @@ impl DownloadManager {
                 save_path.to_string_lossy().to_string(), // TODO: 把save_path.to_string_lossy().to_string()保存到一个变量里，像current一样
                 current,
             );
-            // 更新总体下载进度
-            self.downloaded_image_count.fetch_add(1, Ordering::Relaxed);
-            let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
-            let total_image_count = self.total_image_count.load(Ordering::Relaxed);
-            emit_update_overall_progress_event(
-                &self.app,
-                downloaded_image_count,
-                total_image_count,
-            );
             // 每下载完一张图片，都休息1秒，避免风控
             // tokio::time::sleep(Duration::from_secs(1)).await;
         }
         // 该章节的图片下载完成，释放permit，允许其他章节下载
         drop(permit);
-        // 如果DownloadManager所有图片全部都已下载(无论成功或失败)，则清空下载进度
-        let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
-        let total_image_count = self.total_image_count.load(Ordering::Relaxed);
-        if downloaded_image_count == total_image_count {
-            self.downloaded_image_count.store(0, Ordering::Relaxed);
-            self.total_image_count.store(0, Ordering::Relaxed);
-        }
         // 检查此章节的图片是否全部下载成功
         // 此章节的图片未全部下载成功
         if current != total {
@@ -294,8 +272,6 @@ impl DownloadManager {
             .map(|data| data.complete_url)
             .collect();
         let total = urls.len() as u32;
-        // 记录总共需要下载的图片数量
-        self.total_image_count.fetch_add(total, Ordering::Relaxed);
         let mut current = 0;
         emit_start_event(
             &self.app,
@@ -329,27 +305,11 @@ impl DownloadManager {
                 save_path.to_string_lossy().to_string(),
                 current,
             );
-            // 更新总体下载进度
-            self.downloaded_image_count.fetch_add(1, Ordering::Relaxed);
-            let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
-            let total_image_count = self.total_image_count.load(Ordering::Relaxed);
-            emit_update_overall_progress_event(
-                &self.app,
-                downloaded_image_count,
-                total_image_count,
-            );
             // 每下载完一张图片，都休息1秒，避免风控
             // tokio::time::sleep(Duration::from_secs(1)).await;
         }
         // 该章节的图片下载完成，释放permit，允许其他章节下载
         drop(permit);
-        // 如果DownloadManager所有图片全部都已下载(无论成功或失败)，则清空下载进度
-        let downloaded_image_count = self.downloaded_image_count.load(Ordering::Relaxed);
-        let total_image_count = self.total_image_count.load(Ordering::Relaxed);
-        if downloaded_image_count == total_image_count {
-            self.downloaded_image_count.store(0, Ordering::Relaxed);
-            self.total_image_count.store(0, Ordering::Relaxed);
-        }
         // 检查此章节的图片是否全部下载成功
         // TODO: 重构下面的代码
         if current == total {
@@ -445,22 +405,6 @@ fn emit_error_event(app: &AppHandle, id: i64, url: String, err_msg: String) {
 fn emit_end_event(app: &AppHandle, id: i64, err_msg: Option<String>) {
     let payload = events::DownloadEndEventPayload { id, err_msg };
     let event = events::DownloadEndEvent(payload);
-    let _ = event.emit(app);
-}
-
-#[allow(clippy::cast_lossless)]
-fn emit_update_overall_progress_event(
-    app: &AppHandle,
-    downloaded_image_count: u32,
-    total_image_count: u32,
-) {
-    let percentage: f64 = downloaded_image_count as f64 / total_image_count as f64 * 100.0;
-    let payload = events::UpdateOverallDownloadProgressEventPayload {
-        downloaded_image_count,
-        total_image_count,
-        percentage,
-    };
-    let event = events::UpdateOverallDownloadProgressEvent(payload);
     let _ = event.emit(app);
 }
 

@@ -51,7 +51,6 @@ pub fn run() {
             DownloadImageSuccessEvent,
             DownloadImageErrorEvent,
             DownloadEndEvent,
-            UpdateOverallDownloadProgressEvent,
             DownloadSpeedEvent,
         ]);
 
