@@ -15,9 +15,9 @@ use url::form_urlencoded;
 
 use crate::config::Config;
 use crate::responses::{
-    AlbumPlusRespData, AppQrcodeStatusRespData, BiliResp, ComicRespData, GenerateAppQrcodeRespData,
-    GenerateWebQrcodeRespData, ImageIndexRespData, ImageTokenRespData, SearchRespData,
-    UserProfileRespData, WebQrcodeStatusRespData,
+    AlbumPlusRespData, AppQrcodeStatusRespData, BiliResp, ComicRespData, ConfirmAppQrcodeRespData,
+    GenerateAppQrcodeRespData, GenerateWebQrcodeRespData, ImageIndexRespData, ImageTokenRespData,
+    SearchRespData, UserProfileRespData, WebQrcodeStatusRespData,
 };
 use crate::types::{AlbumPlus, AppQrcodeData, AppQrcodeStatus, Comic, WebQrcodeData};
 
@@ -239,6 +239,43 @@ impl BiliClient {
             ))?;
 
         Ok(web_qrcode_status_resp_data)
+    }
+
+    #[allow(clippy::unreadable_literal)]
+    pub async fn confirm_app_qrcode(
+        &self,
+        auth_code: &str,
+        sessdata: &str,
+        csrf: &str,
+    ) -> anyhow::Result<ConfirmAppQrcodeRespData> {
+        let cookie = format!("SESSDATA={sessdata}");
+        let form = json!({
+            "auth_code": auth_code,
+            "build": 708200,
+            "csrf": csrf,
+        });
+        // 发送确认App二维码请求
+        let http_resp = Self::client()
+            .post("https://passport.bilibili.com/x/passport-tv-login/h5/qrcode/confirm")
+            .header("cookie", cookie)
+            .form(&form)
+            .send()
+            .await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
+        if status != StatusCode::OK {
+            return Err(anyhow!(
+                "确认App二维码失败，预料之外的状态码({status}): {body}"
+            ));
+        }
+        // 尝试将body解析为ConfirmAppQrcodeRespData
+        let confirm_app_qrcode_resp_data = serde_json::from_str::<ConfirmAppQrcodeRespData>(&body)
+            .context(format!(
+                "确认App二维码失败，将body解析为ConfirmAppQrcodeRespData失败: {body}"
+            ))?;
+
+        Ok(confirm_app_qrcode_resp_data)
     }
 
     pub async fn get_user_profile(&self) -> anyhow::Result<UserProfileRespData> {

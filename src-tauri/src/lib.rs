@@ -32,6 +32,7 @@ pub fn run() {
             get_app_qrcode_status,
             generate_web_qrcode,
             get_web_qrcode_status,
+            confirm_app_qrcode,
             search,
             get_comic,
             get_album_plus,
