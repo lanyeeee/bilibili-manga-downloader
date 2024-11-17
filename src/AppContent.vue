@@ -64,8 +64,20 @@ async function showConfigInFileManager() {
 }
 
 async function test() {
-  const result = await commands.getComic(26470);
-  console.log(result);
+  const generateResult = await commands.generateWebQrcode();
+  if (generateResult.status === "error") {
+    notification.error({title: "生成二维码失败", description: generateResult.error});
+    return;
+  }
+  console.log(generateResult);
+
+  const statusResult = await commands.getWebQrcodeStatus(generateResult.data.qrcodeKey);
+  if (statusResult.status === "error") {
+    notification.error({title: "获取二维码状态失败", description: statusResult.error});
+    return;
+  }
+  console.log(statusResult);
+
 }
 
 </script>
