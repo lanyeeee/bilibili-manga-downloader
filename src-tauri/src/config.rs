@@ -9,9 +9,11 @@ use tauri::{AppHandle, Manager};
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    pub uid: u64,
     pub access_token: String,
     pub download_dir: PathBuf,
     pub archive_format: ArchiveFormat,
+    pub last_update_check_ts: i64,
 }
 
 impl Config {
@@ -20,9 +22,11 @@ impl Config {
         let config_path = app_data_dir.join("config.json");
         // TODO: 实现Default trait以替代这种写法
         let default_config = Config {
+            uid: 0,
             access_token: String::new(),
             download_dir: app_data_dir.join("漫画下载"),
             archive_format: ArchiveFormat::default(),
+            last_update_check_ts: 0,
         };
         // 如果配置文件存在且能够解析，则使用配置文件中的配置，否则使用默认配置
         let config = if config_path.exists() {

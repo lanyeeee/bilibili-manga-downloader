@@ -12,12 +12,7 @@ use crate::extensions::AnyhowErrorToStringChain;
 use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
 
 use anyhow::{anyhow, Context};
-use bytes::Bytes;
 use parking_lot::RwLock;
-use reqwest::StatusCode;
-use reqwest_middleware::ClientWithMiddleware;
-use reqwest_retry::policies::ExponentialBackoff;
-use reqwest_retry::RetryTransientMiddleware;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
@@ -42,7 +37,6 @@ enum DownloadPayload {
 #[derive(Clone)]
 pub struct DownloadManager {
     app: AppHandle,
-    http_client: ClientWithMiddleware,
     sender: Arc<mpsc::Sender<DownloadPayload>>,
     ep_sem: Arc<Semaphore>,
     byte_per_sec: Arc<AtomicU64>,
@@ -54,9 +48,8 @@ impl DownloadManager {
 
         let manager = DownloadManager {
             app: app.clone(),
-            http_client: create_http_client(),
             sender: Arc::new(sender),
-            ep_sem: Arc::new(Semaphore::new(5)),
+            ep_sem: Arc::new(Semaphore::new(1)),
             byte_per_sec: Arc::new(AtomicU64::new(0)),
         };
 
@@ -110,45 +103,52 @@ impl DownloadManager {
     // TODO: 这里不应该返回错误，否则会被忽略
     #[allow(clippy::cast_possible_truncation)]
     async fn process_episode(self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
-        emit_pending_event(&self.app, ep_info.episode_id, ep_info.episode_title.clone());
+        emit_pending_event(
+            &self.app,
+            ep_info.episode_id,
+            ep_info.comic_title.clone(),
+            ep_info.episode_title.clone(),
+        );
         // 限制同时下载的章节数量
         let permit = self.ep_sem.acquire().await?;
-
+        // 获取path_urls
         let bili_client = self.bili_client();
         let image_index_resp_data = bili_client.get_image_index(ep_info.episode_id).await?;
-        let urls: Vec<String> = image_index_resp_data
+        let path_urls: Vec<String> = image_index_resp_data
             .images
             .iter()
             .map(|img| img.path.clone())
             .collect();
-        let image_token_data_data = bili_client.get_image_token(&urls).await?;
-        // 构造图片下载链接
-        let urls: Vec<String> = image_token_data_data
-            .into_iter()
-            .map(|data| data.complete_url)
-            .collect();
-        let total = urls.len() as u32;
+        // 发送下载开始事件
+        let total = path_urls.len() as u32;
+        emit_start_event(&self.app, ep_info.episode_id, total);
+        // 准备下载需要的变量
         let mut current = 0;
-        emit_start_event(
-            &self.app,
-            ep_info.episode_id,
-            ep_info.episode_title.clone(),
-            total,
-        );
         // 下载前先创建临时下载目录
         let temp_download_dir = get_ep_temp_download_dir(&self.app, &ep_info);
         std::fs::create_dir_all(&temp_download_dir)
             .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
-        for (i, url) in urls.iter().enumerate() {
+        // 逐一下载图片
+        for (i, path_url) in path_urls.into_iter().enumerate() {
+            let urls = vec![path_url.clone()];
+            let image_token_resp_data = match bili_client.get_image_token(&urls).await {
+                Ok(data) => data,
+                Err(err) => {
+                    let id = ep_info.episode_id;
+                    let err_msg = err.to_string_chain();
+                    emit_error_event(&self.app, id, path_url, err_msg);
+                    // 如果获取图片下载链接失败，则不再下载剩余的图片，直接跳出循环
+                    break;
+                }
+            };
             let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
+            // 构造图片下载链接
+            let url = &image_token_resp_data[0].complete_url;
             // 下载图片
             if let Err(err) = self.download_image(url, &save_path).await {
-                emit_error_event(
-                    &self.app,
-                    ep_info.episode_id,
-                    url.clone(),
-                    err.to_string_chain(),
-                );
+                let id = ep_info.episode_id;
+                let err_msg = err.to_string_chain();
+                emit_error_event(&self.app, id, url.clone(), err_msg);
                 // 如果下载失败，则不再下载剩余的图片，直接跳出循环
                 break;
             }
@@ -160,8 +160,9 @@ impl DownloadManager {
                 save_path.to_string_lossy().to_string(), // TODO: 把save_path.to_string_lossy().to_string()保存到一个变量里，像current一样
                 current,
             );
-            // 每下载完一张图片，都休息1秒，避免风控
-            // tokio::time::sleep(Duration::from_secs(1)).await;
+            // 每下载完一张图片，都休息800-1300毫秒，避免风控
+            let sleep_time = 800 + rand::random::<u64>() % 500;
+            tokio::time::sleep(Duration::from_millis(sleep_time)).await;
         }
         // 该章节的图片下载完成，释放permit，允许其他章节下载
         drop(permit);
@@ -260,40 +261,45 @@ impl DownloadManager {
     #[allow(clippy::cast_possible_truncation)]
     // TODO: 这里不应该返回错误，否则会被忽略
     async fn process_album_plus(self, album_plus_item: AlbumPlusItem) -> anyhow::Result<()> {
-        emit_pending_event(&self.app, album_plus_item.id, album_plus_item.title.clone());
-        // 限制同时下载的章节数量
-        let permit = self.ep_sem.acquire().await?;
-
-        let bili_client = self.bili_client();
-        let image_token_data_data = bili_client.get_image_token(&album_plus_item.pic).await?;
-        // 构造图片下载链接
-        let urls: Vec<String> = image_token_data_data
-            .into_iter()
-            .map(|data| data.complete_url)
-            .collect();
-        let total = urls.len() as u32;
-        let mut current = 0;
-        emit_start_event(
+        // 进来就发送排队事件
+        emit_pending_event(
             &self.app,
             album_plus_item.id,
+            album_plus_item.comic_title.clone(),
             album_plus_item.title.clone(),
-            total,
         );
+        // 限制同时下载的章节数量
+        let permit = self.ep_sem.acquire().await?;
+        // 拿到permit后，发送下载开始事件
+        let total = album_plus_item.pic.len() as u32;
+        emit_start_event(&self.app, album_plus_item.id, total);
+        // 准备下载需要的变量
+        let mut current = 0;
+        let bili_client = self.bili_client();
         // 下载前先创建临时下载目录
         let temp_download_dir = get_album_plus_temp_download_dir(&self.app, &album_plus_item);
         std::fs::create_dir_all(&temp_download_dir)
             .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
-        for (i, url) in urls.iter().enumerate() {
-            let url = url.clone();
+        // 逐一下载图片
+        for (i, path_url) in album_plus_item.pic.into_iter().enumerate() {
+            let urls = vec![path_url.clone()];
+            let image_token_resp_data = match bili_client.get_image_token(&urls).await {
+                Ok(data) => data,
+                Err(err) => {
+                    let id = album_plus_item.id;
+                    let err_msg = err.to_string_chain();
+                    emit_error_event(&self.app, id, path_url, err_msg);
+                    // 如果获取图片下载链接失败，则不再下载剩余的图片，直接跳出循环
+                    break;
+                }
+            };
+            let url = &image_token_resp_data[0].complete_url;
             let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
             // 下载图片
-            if let Err(err) = self.download_image(&url, &save_path).await {
-                emit_error_event(
-                    &self.app,
-                    album_plus_item.id,
-                    url.clone(),
-                    err.to_string_chain(),
-                );
+            if let Err(err) = self.download_image(url, &save_path).await {
+                let id = album_plus_item.id;
+                let err_msg = err.to_string_chain();
+                emit_error_event(&self.app, id, url.clone(), err_msg);
                 // 如果下载失败，则不再下载剩余的图片，直接跳出循环
                 break;
             }
@@ -305,8 +311,9 @@ impl DownloadManager {
                 save_path.to_string_lossy().to_string(),
                 current,
             );
-            // 每下载完一张图片，都休息1秒，避免风控
-            // tokio::time::sleep(Duration::from_secs(1)).await;
+            // 每下载完一张图片，都休息800-1300毫秒，避免风控
+            let sleep_time = 800 + rand::random::<u64>() % 500;
+            tokio::time::sleep(Duration::from_millis(sleep_time)).await;
         }
         // 该章节的图片下载完成，释放permit，允许其他章节下载
         drop(permit);
@@ -330,6 +337,7 @@ impl DownloadManager {
 
     async fn download_image(&self, url: &str, save_path: &Path) -> anyhow::Result<()> {
         let image_data = self
+            .bili_client()
             .get_image_bytes(url)
             .await
             .context(format!("下载图片 {url} 失败"))?;
@@ -339,21 +347,6 @@ impl DownloadManager {
         self.byte_per_sec
             .fetch_add(image_data.len() as u64, Ordering::Relaxed);
         Ok(())
-    }
-
-    async fn get_image_bytes(&self, url: &str) -> anyhow::Result<Bytes> {
-        // 发送下载图片请求
-        let http_resp = self.http_client.get(url).send().await?;
-        // 检查http响应状态码
-        let status = http_resp.status();
-        if status != StatusCode::OK {
-            let body = http_resp.text().await?;
-            return Err(anyhow!("下载图片 {url} 失败，预料之外的状态码: {body}"));
-        }
-        // 读取图片数据
-        let image_data = http_resp.bytes().await?;
-
-        Ok(image_data)
     }
 
     fn bili_client(&self) -> BiliClient {
@@ -378,14 +371,18 @@ fn get_album_plus_temp_download_dir(app: &AppHandle, album_plus_item: &AlbumPlus
         .join(format!(".下载中-{}", album_plus_item.title)) // 以 `.下载中-` 开头，表示是临时目录
 }
 
-fn emit_start_event(app: &AppHandle, id: i64, title: String, total: u32) {
-    let payload = events::DownloadStartEventPayload { id, title, total };
+fn emit_start_event(app: &AppHandle, id: i64, total: u32) {
+    let payload = events::DownloadStartEventPayload { id, total };
     let event = events::DownloadStartEvent(payload);
     let _ = event.emit(app);
 }
 
-fn emit_pending_event(app: &AppHandle, id: i64, title: String) {
-    let payload = events::DownloadPendingEventPayload { id, title };
+fn emit_pending_event(app: &AppHandle, id: i64, comic_title: String, episode_title: String) {
+    let payload = events::DownloadPendingEventPayload {
+        id,
+        comic_title,
+        episode_title,
+    };
     let event = events::DownloadPendingEvent(payload);
     let _ = event.emit(app);
 }
@@ -412,12 +409,4 @@ fn emit_download_speed_event(app: &AppHandle, speed: String) {
     let payload = DownloadSpeedEventPayload { speed };
     let event = DownloadSpeedEvent(payload);
     let _ = event.emit(app);
-}
-
-fn create_http_client() -> ClientWithMiddleware {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
-
-    reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
-        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-        .build()
 }

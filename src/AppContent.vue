@@ -41,6 +41,9 @@ watch(() => config.value?.accessToken, async () => {
     userProfile.value = undefined;
     return;
   }
+  if (result.data.mid !== config.value.uid) {
+    config.value.uid = result.data.mid;
+  }
   userProfile.value = result.data;
   message.success("获取用户信息成功");
 });
@@ -52,14 +55,55 @@ onMounted(async () => {
   };
   // 获取配置
   config.value = await commands.getConfig();
+  // 检查更新
+  const ts = Date.now();
+  // 如果上次检查更新时间距离现在超过1分钟，就检查更新
+  if (ts - config.value.lastUpdateCheckTs > 60 * 1000) {
+    await checkUpdate();
+    config.value.lastUpdateCheckTs = ts;
+  }
 });
 
+async function checkUpdate() {
+  const result = await commands.checkUpdate();
+  if (result.status === "error") {
+    notification.error({
+      title: "检查更新失败",
+      description: result.error,
+      content: "如果继续使用，可能会因为漏掉重要更新(例如风控策略变更)而导致封号"
+    });
+    return;
+  }
+  const checkUpdateResult = result.data;
+  if (checkUpdateResult.importantVersions.length > 0) {
+    // 重复发3次
+    const versions = checkUpdateResult.importantVersions.join(", ");
+    for (let i = 0; i < 3; i++) {
+      notification.error({
+        title: "有重要更新，请立刻停止使用当前版本",
+        description: "请前往 https://github.com/lanyeeee/bilibili-manga-downloader 查看Release页面",
+        content: `重要更新版本: ${versions}`,
+        meta: "很重要所以说3遍"
+      });
+    }
+    return;
+  }
+
+  if (checkUpdateResult.normalVersions.length > 0) {
+    const versions = checkUpdateResult.normalVersions.join(", ");
+    notification.info({
+      title: "有可选更新",
+      description: "请前往 https://github.com/lanyeeee/bilibili-manga-downloader 的Release页面下载",
+      content: `可选更新版本: ${versions}`,
+      meta: "如果当前使用没有问题，可以不更新"
+    });
+    return;
+  }
+
+  notification.success({title: "当前版本是最新版本", duration: 2000});
+}
+
 async function test() {
-  notification.error({
-    title: "标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 标题 ",
-    description: "描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 描述 ",
-    content: "内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 内容 ",
-  });
 
 }
 
@@ -78,7 +122,7 @@ async function test() {
           </n-tab-pane>
         </n-tabs>
       </div>
-      <div class="basis-1/2 flex flex-col overflow-hidden">
+      <div class="basis-1/2 flex flex-col overflow-hidden h-full">
         <div class="flex">
           <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
           <n-button @click="cookieLoginDialogShowing=true" type="primary" secondary>Cookie登录</n-button>
@@ -91,7 +135,7 @@ async function test() {
             <span class="whitespace-nowrap">{{ userProfile.name }}</span>
           </div>
         </div>
-        <downloading-list class="h-full" v-model:config="config"></downloading-list>
+        <downloading-list class="overflow-auto" v-model:config="config"></downloading-list>
       </div>
     </div>
   </div>

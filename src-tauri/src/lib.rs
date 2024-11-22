@@ -40,6 +40,7 @@ pub fn run() {
             download_album_plus_items,
             show_path_in_file_manager,
             get_user_profile,
+            check_update,
         ])
         .events(tauri_specta::collect_events![
             RemoveWatermarkStartEvent,
