@@ -295,6 +295,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
+ "semver",
  "serde",
  "serde_json",
  "showfile",
