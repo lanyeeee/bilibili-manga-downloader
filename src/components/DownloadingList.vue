@@ -2,13 +2,14 @@
 
 import {onMounted, ref} from "vue";
 import {commands, Config, events} from "../bindings.ts";
-import {NProgress, useNotification} from "naive-ui";
+import {useNotification} from "naive-ui";
 import {open} from "@tauri-apps/plugin-dialog";
 import {path} from "@tauri-apps/api";
 import {appDataDir} from "@tauri-apps/api/path";
 
 type ProgressData = {
-  title: string;
+  comicTitle: string;
+  episodeTitle: string;
   current: number;
   total: number;
   percentage: number;
@@ -25,7 +26,8 @@ const downloadSpeed = ref<string>("");
 onMounted(async () => {
   await events.downloadPendingEvent.listen(({payload}) => {
     let progressData: ProgressData = {
-      title: `等待中 ${payload.title}`,
+      comicTitle: payload.comicTitle,
+      episodeTitle: payload.episodeTitle,
       current: 0,
       total: 0,
       percentage: 0,
@@ -40,7 +42,6 @@ onMounted(async () => {
       return;
     }
     progressData.total = payload.total;
-    progressData.title = payload.title;
   });
 
   await events.downloadImageSuccessEvent.listen(({payload}) => {
@@ -48,7 +49,7 @@ onMounted(async () => {
     if (progressData === undefined) {
       return;
     }
-    progressData.current += 1;
+    progressData.current = payload.current;
     progressData.percentage = Math.round(progressData.current / progressData.total * 100);
   });
 
@@ -61,7 +62,7 @@ onMounted(async () => {
       title: "下载图片失败",
       description: payload.url,
       content: payload.errMsg,
-      meta: progressData.title
+      meta: `${progressData.comicTitle} - ${progressData.episodeTitle}`
     });
   });
 
@@ -71,7 +72,11 @@ onMounted(async () => {
       return;
     }
     if (payload.errMsg !== null) {
-      notification.warning({title: "下载章节失败", content: payload.errMsg, meta: progressData.title});
+      notification.warning({
+        title: "下载章节失败",
+        content: payload.errMsg,
+        meta: `${progressData.comicTitle} - ${progressData.episodeTitle}`
+      });
     }
     progresses.value.delete(payload.id);
   });
@@ -129,14 +134,17 @@ async function selectDownloadDir() {
       <n-radio value="Zip">zip</n-radio>
       <n-radio value="Cbz">cbz</n-radio>
     </n-radio-group>
-    <span>下载速度：{{ downloadSpeed }}</span>
-    <div class="flex-1 overflow-auto">
-      <div class="grid grid-cols-[2fr_4fr_1fr]"
-           v-for="[epId, {title, percentage, indicator}] in progresses"
+<!--    <span>下载速度：{{ downloadSpeed }}</span>-->
+    <div class="overflow-auto">
+      <div class="grid grid-cols-[1fr_1fr_2fr]"
+           v-for="[epId, { comicTitle, episodeTitle, percentage, total, current}] in progresses"
            :key="epId">
-        <span class="mb-1! text-ellipsis whitespace-nowrap overflow-hidden">{{ title }}</span>
-        <n-progress class="" :percentage="percentage"/>
-        <span>{{ indicator }}</span>
+        <span class="mb-1! text-ellipsis whitespace-nowrap overflow-hidden">{{ comicTitle }}</span>
+        <span class="mb-1! text-ellipsis whitespace-nowrap overflow-hidden">{{ episodeTitle }}</span>
+        <span v-if="total===0">等待中</span>
+        <n-progress v-else class="" :percentage="percentage">
+          {{ current }}/{{ total }}
+        </n-progress>
       </div>
     </div>
   </div>

@@ -41,6 +41,9 @@ watch(() => config.value?.accessToken, async () => {
     userProfile.value = undefined;
     return;
   }
+  if (result.data.mid !== config.value.uid) {
+    config.value.uid = result.data.mid;
+  }
   userProfile.value = result.data;
   message.success("获取用户信息成功");
 });
@@ -119,7 +122,7 @@ async function test() {
           </n-tab-pane>
         </n-tabs>
       </div>
-      <div class="basis-1/2 flex flex-col overflow-hidden">
+      <div class="basis-1/2 flex flex-col overflow-hidden h-full">
         <div class="flex">
           <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
           <n-button @click="cookieLoginDialogShowing=true" type="primary" secondary>Cookie登录</n-button>
@@ -132,7 +135,7 @@ async function test() {
             <span class="whitespace-nowrap">{{ userProfile.name }}</span>
           </div>
         </div>
-        <downloading-list class="h-full" v-model:config="config"></downloading-list>
+        <downloading-list class="overflow-auto" v-model:config="config"></downloading-list>
       </div>
     </div>
   </div>
