@@ -1,15 +1,17 @@
-use std::collections::BTreeMap;
-use std::io::Cursor;
-use std::time::Duration;
-
 use anyhow::{anyhow, Context};
 use base64::engine::general_purpose;
 use base64::Engine;
+use bytes::Bytes;
 use image::Rgb;
 use parking_lot::RwLock;
 use qrcode::QrCode;
-use reqwest::{Client, ClientBuilder, StatusCode};
+use reqwest::StatusCode;
+use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::policies::ExponentialBackoff;
+use reqwest_retry::RetryTransientMiddleware;
 use serde_json::json;
+use std::collections::BTreeMap;
+use std::io::Cursor;
 use tauri::{AppHandle, Manager};
 use url::form_urlencoded;
 
@@ -20,26 +22,34 @@ use crate::responses::{
     SearchRespData, UserProfileRespData, WebQrcodeStatusRespData,
 };
 use crate::types::{AlbumPlus, AppQrcodeData, AppQrcodeStatus, Comic, WebQrcodeData};
+use crate::utils::{gen_aurora_eid, gen_session_id, gen_trace_id, generate_android_id};
 
 const APP_KEY: &str = "cc8617fd6961e070";
 const APP_SEC: &str = "3131924b941aac971e45189f265262be";
+#[allow(clippy::unreadable_literal)]
+const BUILD: i32 = 36605000;
+const VERSION: &str = "6.5.0";
+const BUVID_PREFIX: &str = "XX";
 
 #[derive(Clone)]
 pub struct BiliClient {
     app: AppHandle,
+    http_client: ClientWithMiddleware,
+    buvid: String,
+    session_id: String,
 }
 
 impl BiliClient {
     pub fn new(app: AppHandle) -> Self {
-        Self { app }
-    }
-
-    pub fn client() -> Client {
-        // TODO: 添加重试机制
-        ClientBuilder::new()
-            .timeout(Duration::from_secs(2)) // 每个请求超过2秒就超时
-            .build()
-            .unwrap()
+        let buvid = generate_buvid();
+        let http_client = create_http_client();
+        let session_id = gen_session_id();
+        Self {
+            app,
+            http_client,
+            buvid,
+            session_id,
+        }
     }
 
     pub async fn generate_app_qrcode(&self) -> anyhow::Result<AppQrcodeData> {
@@ -49,7 +59,8 @@ impl BiliClient {
         ]);
         let signed_params = app_sign(params);
         // 发送生成二维码请求
-        let http_resp = Self::client()
+        let http_resp = self
+            .http_client
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/auth_code")
             .query(&signed_params)
             .send()
@@ -106,7 +117,8 @@ impl BiliClient {
         ]);
         let signed_params = app_sign(params);
         // 发送获取二维码状态请求
-        let http_res = Self::client()
+        let http_res = self
+            .http_client
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/poll")
             .query(&signed_params)
             .send()
@@ -149,7 +161,8 @@ impl BiliClient {
 
     pub async fn generate_web_qrcode(&self) -> anyhow::Result<WebQrcodeData> {
         // 发送生成二维码请求
-        let http_resp = Self::client()
+        let http_resp = self
+            .http_client
             .get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
             .send()
             .await?;
@@ -202,7 +215,8 @@ impl BiliClient {
             "qrcode_key": qrcode_key,
         });
         // 发送获取二维码状态请求
-        let http_resp = Self::client()
+        let http_resp = self
+            .http_client
             .get("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
             .query(&params)
             .send()
@@ -255,7 +269,8 @@ impl BiliClient {
             "csrf": csrf,
         });
         // 发送确认App二维码请求
-        let http_resp = Self::client()
+        let http_resp = self
+            .http_client
             .post("https://passport.bilibili.com/x/passport-tv-login/h5/qrcode/confirm")
             .header("cookie", cookie)
             .form(&form)
@@ -286,7 +301,8 @@ impl BiliClient {
         ]);
         let signed_params = app_sign(params);
         // 发送获取用户信息请求
-        let http_resp = Self::client()
+        let http_resp = self
+            .http_client
             .get("https://app.bilibili.com/x/v2/account/myinfo")
             .query(&signed_params)
             .send()
@@ -327,7 +343,8 @@ impl BiliClient {
             "pageSize": 20,
         });
         // 发送搜索漫画请求
-        let http_resp = Self::client()
+        let http_resp = self
+            .http_client
             .post("https://manga.bilibili.com/twirp/search.v1.Search/SearchKeyword")
             .json(&payload)
             .send()
@@ -360,21 +377,43 @@ impl BiliClient {
 
     pub async fn get_comic(&self, comic_id: i64) -> anyhow::Result<Comic> {
         let access_token = self.access_token();
+        let uid = self.uid();
         let params = json!({
+            "appkey": APP_KEY,
+            "mobi_app": "android_comic",
+            "version": VERSION,
+            "build": BUILD,
+            "channel": "pc_bilicomic",
+            "platform": "android",
             "device": "android",
+            "buvid": self.buvid,
+            "machine": "HUAWEI DCO-AL00",
             "access_key": access_token,
+            "is_teenager": 0,
+            "no_recommend": 0,
+            "network": "wifi",
+            "ts": chrono::Local::now().timestamp(),
         });
         let payload = json!({"comic_id": comic_id});
         // 发送获取漫画详情请求
-        let http_res = Self::client()
+        let http_resp = self.http_client
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail")
             .query(&params)
+            .header("origin", "manga.bilibili.com")
+            .header("pagerouter", "/flutter/app_entry")
+            .header("session_id", self.session_id.clone())
+            .header("user-agent", "Dalvik/2.1.0 (Linux; U; Android 12; DCO-AL00 Build/086bf89.0) 6.5.0 os/android model/DCO-AL00 mobi_app/android_comic build/36605000 channel/pc_bilicomic innerVer/36605000 osVer/12 network/2")
+            .header("x-bili-trace-id", gen_trace_id())
+            .header("x-bili-aurora-eid", gen_aurora_eid(uid))
+            .header("x-bili-aurora-zone", "")
+            .header("accept-encoding", "gzip")
+            .header("content-type", "application/json; charset=utf-8")
             .json(&payload)
             .send()
             .await?;
         // 检查http响应状态码
-        let status = http_res.status();
-        let body = http_res.text().await?;
+        let status = http_resp.status();
+        let body = http_resp.text().await?;
         if status != StatusCode::OK {
             return Err(anyhow!(
                 "获取漫画详情失败，预料之外的状态码({status}): {body}"
@@ -406,15 +445,37 @@ impl BiliClient {
 
     pub async fn get_album_plus(&self, comic_id: i64) -> anyhow::Result<AlbumPlus> {
         let access_token = self.access_token();
+        let uid = self.uid();
         let params = json!({
-            "version": "6.5.0",
+            "appkey": APP_KEY,
+            "mobi_app": "android_comic",
+            "version": VERSION,
+            "build": BUILD,
+            "channel": "pc_bilicomic",
+            "platform": "android",
+            "device": "android",
+            "buvid": self.buvid,
+            "machine": "HUAWEI DCO-AL00",
             "access_key": access_token,
+            "is_teenager": 0,
+            "no_recommend": 0,
+            "network": "wifi",
+            "ts": chrono::Local::now().timestamp(),
         });
         let payload = json!({"comic_id": comic_id});
         // 发送获取特典请求
-        let http_res = Self::client()
+        let http_res = self.http_client
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetComicAlbumPlus")
             .query(&params)
+            .header("origin", "manga.bilibili.com")
+            .header("pagerouter", "/flutter/app_entry")
+            .header("session_id", self.session_id.clone())
+            .header("user-agent", "Dalvik/2.1.0 (Linux; U; Android 12; DCO-AL00 Build/086bf89.0) 6.5.0 os/android model/DCO-AL00 mobi_app/android_comic build/36605000 channel/pc_bilicomic innerVer/36605000 osVer/12 network/2")
+            .header("x-bili-trace-id", gen_trace_id())
+            .header("x-bili-aurora-eid", gen_aurora_eid(uid))
+            .header("x-bili-aurora-zone", "")
+            .header("accept-encoding", "gzip")
+            .header("content-type", "application/json; charset=utf-8")
             .json(&payload)
             .send()
             .await?;
@@ -448,17 +509,37 @@ impl BiliClient {
 
     pub async fn get_image_index(&self, episode_id: i64) -> anyhow::Result<ImageIndexRespData> {
         let access_token = self.access_token();
+        let uid = self.uid();
         let params = json!({
+            "appkey": APP_KEY,
             "mobi_app": "android_comic",
-            "version": "6.5.0",
+            "version": VERSION,
+            "build": BUILD,
+            "channel": "pc_bilicomic",
+            "platform": "android",
             "device": "android",
+            "buvid": self.buvid,
+            "machine": "HUAWEI DCO-AL00",
             "access_key": access_token,
+            "is_teenager": 0,
+            "no_recommend": 0,
+            "network": "wifi",
+            "ts": chrono::Local::now().timestamp(),
         });
         let payload = json!({"ep_id": episode_id});
         // 发送获取ImageIndex的请求
-        let http_resp = Self::client()
+        let http_resp = self.http_client
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
             .query(&params)
+            .header("origin", "manga.bilibili.com")
+            .header("pagerouter", "/flutter/app_entry")
+            .header("session_id", self.session_id.clone())
+            .header("user-agent", "Dalvik/2.1.0 (Linux; U; Android 12; DCO-AL00 Build/086bf89.0) 6.5.0 os/android model/DCO-AL00 mobi_app/android_comic build/36605000 channel/pc_bilicomic innerVer/36605000 osVer/12 network/2")
+            .header("x-bili-trace-id", gen_trace_id())
+            .header("x-bili-aurora-eid", gen_aurora_eid(uid))
+            .header("x-bili-aurora-zone", "")
+            .header("accept-encoding", "gzip")
+            .header("content-type", "application/json; charset=utf-8")
             .json(&payload)
             .send()
             .await?;
@@ -497,17 +578,38 @@ impl BiliClient {
 
     pub async fn get_image_token(&self, urls: &Vec<String>) -> anyhow::Result<ImageTokenRespData> {
         let access_token = self.access_token();
+        let uid = self.uid();
         let params = json!({
+            "appkey": APP_KEY,
             "mobi_app": "android_comic",
-            "version": "6.5.0",
+            "version": VERSION,
+            "build": BUILD,
+            "channel": "pc_bilicomic",
+            "platform": "android",
+            "device": "android",
+            "buvid": self.buvid,
+            "machine": "HUAWEI DCO-AL00",
             "access_key": access_token,
+            "is_teenager": 0,
+            "no_recommend": 0,
+            "network": "wifi",
+            "ts": chrono::Local::now().timestamp(),
         });
         let urls_str = serde_json::to_string(urls)?;
         let payload = json!({"urls": urls_str});
         // 发送获取ImageToken的请求
-        let http_resp = Self::client()
+        let http_resp = self.http_client
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken")
             .query(&params)
+            .header("origin", "manga.bilibili.com")
+            .header("pagerouter", "/flutter/app_entry")
+            .header("session_id", self.session_id.clone())
+            .header("user-agent", "Dalvik/2.1.0 (Linux; U; Android 12; DCO-AL00 Build/086bf89.0) 6.5.0 os/android model/DCO-AL00 mobi_app/android_comic build/36605000 channel/pc_bilicomic innerVer/36605000 osVer/12 network/2")
+            .header("x-bili-trace-id", gen_trace_id())
+            .header("x-bili-aurora-eid", gen_aurora_eid(uid))
+            .header("x-bili-aurora-zone", "")
+            .header("accept-encoding", "gzip")
+            .header("content-type", "application/json; charset=utf-8")
             .json(&payload)
             .send()
             .await?;
@@ -540,6 +642,28 @@ impl BiliClient {
         Ok(image_token_data)
     }
 
+    pub async fn get_image_bytes(&self, url: &str) -> anyhow::Result<Bytes> {
+        let uid = self.uid();
+        // 发送下载图片请求
+        let http_resp = self.http_client.get(url)
+            .header("user-agent", "Dalvik/2.1.0 (Linux; U; Android 12; DCO-AL00 Build/086bf89.0) 6.8.5 os/android model/DCO-AL00 mobi_app/android_comic build/36608060 channel/pc_bilicomic innerVer/36608060 osVer/12 network/2")
+            .header("x-bili-trace-id", gen_trace_id())
+            .header("x-bili-aurora-eid", gen_aurora_eid(uid))
+            .header("x-bili-aurora-zone", "")
+            .header("accept-encoding", "gzip")
+            .send().await?;
+        // 检查http响应状态码
+        let status = http_resp.status();
+        if status != StatusCode::OK {
+            let body = http_resp.text().await?;
+            return Err(anyhow!("下载图片 {url} 失败，预料之外的状态码: {body}"));
+        }
+        // 读取图片数据
+        let image_data = http_resp.bytes().await?;
+
+        Ok(image_data)
+    }
+
     fn access_token(&self) -> String {
         self.app
             .state::<RwLock<Config>>()
@@ -547,6 +671,17 @@ impl BiliClient {
             .access_token
             .clone()
     }
+
+    fn uid(&self) -> u64 {
+        self.app.state::<RwLock<Config>>().read().uid
+    }
+}
+
+fn generate_buvid() -> String {
+    let android_id = generate_android_id();
+    let id_md5 = format!("{:x}", md5::compute(android_id));
+    let id_e = format!("{}{}{}", &id_md5[2..3], &id_md5[12..13], &id_md5[22..23]);
+    format!("{BUVID_PREFIX}{id_e}{id_md5}")
 }
 
 fn app_sign(mut params: BTreeMap<String, String>) -> BTreeMap<String, String> {
@@ -557,4 +692,14 @@ fn app_sign(mut params: BTreeMap<String, String>) -> BTreeMap<String, String> {
     let sign = format!("{:x}", md5::compute(query + APP_SEC));
     params.insert("sign".to_string(), sign);
     params
+}
+
+fn create_http_client() -> ClientWithMiddleware {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
+
+    let builder = reqwest::ClientBuilder::new().no_proxy();
+
+    reqwest_middleware::ClientBuilder::new(builder.build().unwrap())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build()
 }
