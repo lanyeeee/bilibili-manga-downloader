@@ -1,8 +1,10 @@
 use std::path::PathBuf;
+use std::vec;
 
 use anyhow::anyhow;
 use parking_lot::RwLock;
 use path_slash::PathBufExt;
+use reqwest::StatusCode;
 use tauri::{AppHandle, State};
 
 use crate::bili_client::BiliClient;
@@ -10,10 +12,12 @@ use crate::config::Config;
 use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::responses::{
-    ConfirmAppQrcodeRespData, SearchRespData, UserProfileRespData, WebQrcodeStatusRespData,
+    ConfirmAppQrcodeRespData, GithubReleasesResp, SearchRespData, UserProfileRespData,
+    WebQrcodeStatusRespData,
 };
 use crate::types::{
-    AlbumPlus, AlbumPlusItem, AppQrcodeData, AppQrcodeStatus, Comic, EpisodeInfo, WebQrcodeData,
+    AlbumPlus, AlbumPlusItem, AppQrcodeData, AppQrcodeStatus, CheckUpdateResult, Comic,
+    EpisodeInfo, WebQrcodeData,
 };
 
 #[tauri::command]
@@ -165,4 +169,63 @@ pub fn show_path_in_file_manager(path: &str) -> CommandResult<()> {
     }
     showfile::show_path_in_file_manager(path);
     Ok(())
+}
+
+#[tauri::command(async)]
+#[specta::specta]
+pub async fn check_update(app: AppHandle) -> CommandResult<CheckUpdateResult> {
+    let http_client = reqwest::ClientBuilder::new().no_proxy().build()?;
+    let http_resp = http_client
+        .get("https://api.github.com/repos/lanyeeee/bilibili-manga-downloader/releases")
+        .header("user-agent", "lanyeeee/bilibili-manga-downloader")
+        .send()
+        .await?;
+    let status = http_resp.status();
+    let body = http_resp.text().await?;
+    if status != StatusCode::OK {
+        return Err(anyhow!("获取更新信息失败，预料之外的状态码({status}: {body})").into());
+    }
+    // current_version 格式为 0.0.0 的版本号
+    let current_version = app.package_info().version.to_string();
+    // 滤出 tag_name 为 v0.0.0 格式且大于当前版本的 release
+    let releases = serde_json::from_str::<GithubReleasesResp>(&body)?
+        .into_iter()
+        .filter_map(|release| {
+            // 滤出 tag_name 为 v0.0.0 格式的 release
+            let tag_name = &release.tag_name;
+            if !tag_name.starts_with('v') {
+                return None;
+            }
+            if tag_name[1..].split('.').count() != 3 {
+                return None;
+            }
+            // 滤出大于当前版本的 release
+            let Ok(current_version) = semver::Version::parse(&current_version) else {
+                return None;
+            };
+            let Ok(release_version) = semver::Version::parse(&tag_name[1..]) else {
+                return None;
+            };
+            if release_version <= current_version {
+                return None;
+            }
+            Some(release)
+        });
+    // 将 release 的 tag_name 提取出来
+    let mut normal_releases = vec![];
+    let mut important_releases = vec![];
+    for release in releases {
+        if release.name.contains("重要重要重要") {
+            important_releases.push(release.tag_name);
+        } else {
+            normal_releases.push(release.tag_name);
+        }
+    }
+    // 返回检查更新结果
+    let check_update_result = CheckUpdateResult {
+        normal_versions: normal_releases,
+        important_versions: important_releases,
+    };
+
+    Ok(check_update_result)
 }
