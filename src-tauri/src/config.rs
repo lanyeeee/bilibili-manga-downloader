@@ -12,6 +12,7 @@ pub struct Config {
     pub access_token: String,
     pub download_dir: PathBuf,
     pub archive_format: ArchiveFormat,
+    pub last_update_check_ts: i64,
 }
 
 impl Config {
@@ -23,6 +24,7 @@ impl Config {
             access_token: String::new(),
             download_dir: app_data_dir.join("漫画下载"),
             archive_format: ArchiveFormat::default(),
+            last_update_check_ts: 0,
         };
         // 如果配置文件存在且能够解析，则使用配置文件中的配置，否则使用默认配置
         let config = if config_path.exists() {
