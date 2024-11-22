@@ -53,7 +53,8 @@ pub struct RemoveWatermarkEndEvent(pub RemoveWatermarkEndEventPayload);
 #[serde(rename_all = "camelCase")]
 pub struct DownloadPendingEventPayload {
     pub id: i64,
-    pub title: String,
+    pub comic_title: String,
+    pub episode_title: String,
 }
 #[derive(Serialize, Deserialize, Clone, Type, Event)]
 pub struct DownloadPendingEvent(pub DownloadPendingEventPayload);
@@ -62,7 +63,6 @@ pub struct DownloadPendingEvent(pub DownloadPendingEventPayload);
 #[serde(rename_all = "camelCase")]
 pub struct DownloadStartEventPayload {
     pub id: i64,
-    pub title: String,
     pub total: u32,
 }
 #[derive(Serialize, Deserialize, Clone, Type, Event)]
