@@ -36,14 +36,26 @@ pub fn get_config(config: State<RwLock<Config>>) -> Config {
 #[tauri::command(async)]
 #[specta::specta]
 #[allow(clippy::needless_pass_by_value)]
-pub fn save_config(
+pub async fn save_config(
     app: AppHandle,
-    config_state: State<RwLock<Config>>,
+    bili_client: State<'_, BiliClient>,
+    config_state: State<'_, RwLock<Config>>,
     config: Config,
 ) -> CommandResult<()> {
-    let mut config_state = config_state.write();
-    *config_state = config;
-    config_state.save(&app)?;
+    let need_recreate = {
+        let config_state = config_state.read();
+        config_state.proxy_mode != config.proxy_mode
+            || config_state.proxy_host != config.proxy_host
+            || config_state.proxy_port != config.proxy_port
+    };
+
+    *config_state.write() = config;
+    config_state.write().save(&app)?;
+
+    if need_recreate {
+        bili_client.recreate_http_client().await;
+    }
+
     Ok(())
 }
 
@@ -174,7 +186,7 @@ pub fn show_path_in_file_manager(path: &str) -> CommandResult<()> {
 #[tauri::command(async)]
 #[specta::specta]
 pub async fn check_update(app: AppHandle) -> CommandResult<CheckUpdateResult> {
-    let http_client = reqwest::ClientBuilder::new().no_proxy().build()?;
+    let http_client = reqwest::ClientBuilder::new().build()?;
     let http_resp = http_client
         .get("https://api.github.com/repos/lanyeeee/bilibili-manga-downloader/releases")
         .header("user-agent", "lanyeeee/bilibili-manga-downloader")

@@ -12,16 +12,22 @@ use reqwest_retry::RetryTransientMiddleware;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::io::Cursor;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
+use tauri_specta::Event;
 use url::form_urlencoded;
 
 use crate::config::Config;
+use crate::events::{SetProxyErrorEvent, SetProxyErrorEventPayload};
+use crate::extensions::AnyhowErrorToStringChain;
 use crate::responses::{
     AlbumPlusRespData, AppQrcodeStatusRespData, BiliResp, ComicRespData, ConfirmAppQrcodeRespData,
     GenerateAppQrcodeRespData, GenerateWebQrcodeRespData, ImageIndexRespData, ImageTokenRespData,
     SearchRespData, UserProfileRespData, WebQrcodeStatusRespData,
 };
-use crate::types::{AlbumPlus, AppQrcodeData, AppQrcodeStatus, Comic, WebQrcodeData};
+use crate::types::{
+    AlbumPlus, AppQrcodeData, AppQrcodeStatus, AsyncRwLock, Comic, ProxyMode, WebQrcodeData,
+};
 use crate::utils::{gen_aurora_eid, gen_session_id, gen_trace_id, generate_android_id};
 
 const APP_KEY: &str = "cc8617fd6961e070";
@@ -34,7 +40,7 @@ const BUVID_PREFIX: &str = "XX";
 #[derive(Clone)]
 pub struct BiliClient {
     app: AppHandle,
-    http_client: ClientWithMiddleware,
+    http_client: Arc<AsyncRwLock<ClientWithMiddleware>>,
     buvid: String,
     session_id: String,
 }
@@ -42,7 +48,8 @@ pub struct BiliClient {
 impl BiliClient {
     pub fn new(app: AppHandle) -> Self {
         let buvid = generate_buvid();
-        let http_client = create_http_client();
+        let http_client = create_http_client(&app);
+        let http_client = Arc::new(AsyncRwLock::new(http_client));
         let session_id = gen_session_id();
         Self {
             app,
@@ -50,6 +57,11 @@ impl BiliClient {
             buvid,
             session_id,
         }
+    }
+
+    pub async fn recreate_http_client(&self) {
+        let http_client = create_http_client(&self.app);
+        *self.http_client.write().await = http_client;
     }
 
     pub async fn generate_app_qrcode(&self) -> anyhow::Result<AppQrcodeData> {
@@ -61,6 +73,8 @@ impl BiliClient {
         // 发送生成二维码请求
         let http_resp = self
             .http_client
+            .read()
+            .await
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/auth_code")
             .query(&signed_params)
             .send()
@@ -119,6 +133,8 @@ impl BiliClient {
         // 发送获取二维码状态请求
         let http_res = self
             .http_client
+            .read()
+            .await
             .post("https://passport.snm0516.aisee.tv/x/passport-tv-login/qrcode/poll")
             .query(&signed_params)
             .send()
@@ -163,6 +179,8 @@ impl BiliClient {
         // 发送生成二维码请求
         let http_resp = self
             .http_client
+            .read()
+            .await
             .get("https://passport.bilibili.com/x/passport-login/web/qrcode/generate")
             .send()
             .await?;
@@ -217,6 +235,8 @@ impl BiliClient {
         // 发送获取二维码状态请求
         let http_resp = self
             .http_client
+            .read()
+            .await
             .get("https://passport.bilibili.com/x/passport-login/web/qrcode/poll")
             .query(&params)
             .send()
@@ -271,6 +291,8 @@ impl BiliClient {
         // 发送确认App二维码请求
         let http_resp = self
             .http_client
+            .read()
+            .await
             .post("https://passport.bilibili.com/x/passport-tv-login/h5/qrcode/confirm")
             .header("cookie", cookie)
             .form(&form)
@@ -303,6 +325,8 @@ impl BiliClient {
         // 发送获取用户信息请求
         let http_resp = self
             .http_client
+            .read()
+            .await
             .get("https://app.bilibili.com/x/v2/account/myinfo")
             .query(&signed_params)
             .send()
@@ -345,6 +369,8 @@ impl BiliClient {
         // 发送搜索漫画请求
         let http_resp = self
             .http_client
+            .read()
+            .await
             .post("https://manga.bilibili.com/twirp/search.v1.Search/SearchKeyword")
             .json(&payload)
             .send()
@@ -396,7 +422,7 @@ impl BiliClient {
         });
         let payload = json!({"comic_id": comic_id});
         // 发送获取漫画详情请求
-        let http_resp = self.http_client
+        let http_resp = self.http_client.read().await
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ComicDetail")
             .query(&params)
             .header("origin", "manga.bilibili.com")
@@ -464,7 +490,7 @@ impl BiliClient {
         });
         let payload = json!({"comic_id": comic_id});
         // 发送获取特典请求
-        let http_res = self.http_client
+        let http_res = self.http_client.read().await
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetComicAlbumPlus")
             .query(&params)
             .header("origin", "manga.bilibili.com")
@@ -528,7 +554,7 @@ impl BiliClient {
         });
         let payload = json!({"ep_id": episode_id});
         // 发送获取ImageIndex的请求
-        let http_resp = self.http_client
+        let http_resp = self.http_client.read().await
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/GetImageIndex")
             .query(&params)
             .header("origin", "manga.bilibili.com")
@@ -598,7 +624,7 @@ impl BiliClient {
         let urls_str = serde_json::to_string(urls)?;
         let payload = json!({"urls": urls_str});
         // 发送获取ImageToken的请求
-        let http_resp = self.http_client
+        let http_resp = self.http_client.read().await
             .post("https://manga.bilibili.com/twirp/comic.v1.Comic/ImageToken")
             .query(&params)
             .header("origin", "manga.bilibili.com")
@@ -645,7 +671,7 @@ impl BiliClient {
     pub async fn get_image_bytes(&self, url: &str) -> anyhow::Result<Bytes> {
         let uid = self.uid();
         // 发送下载图片请求
-        let http_resp = self.http_client.get(url)
+        let http_resp = self.http_client.read().await.get(url)
             .header("user-agent", "Dalvik/2.1.0 (Linux; U; Android 12; DCO-AL00 Build/086bf89.0) 6.8.5 os/android model/DCO-AL00 mobi_app/android_comic build/36608060 channel/pc_bilicomic innerVer/36608060 osVer/12 network/2")
             .header("x-bili-trace-id", gen_trace_id())
             .header("x-bili-aurora-eid", gen_aurora_eid(uid))
@@ -694,12 +720,40 @@ fn app_sign(mut params: BTreeMap<String, String>) -> BTreeMap<String, String> {
     params
 }
 
-fn create_http_client() -> ClientWithMiddleware {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(2);
+fn create_http_client(app: &AppHandle) -> ClientWithMiddleware {
+    let builder = reqwest::ClientBuilder::new();
 
-    let builder = reqwest::ClientBuilder::new().no_proxy();
+    let proxy_mode = app.state::<RwLock<Config>>().read().proxy_mode.clone();
+    let builder = match proxy_mode {
+        ProxyMode::NoProxy => builder.no_proxy(),
+        ProxyMode::System => builder,
+        ProxyMode::Custom => {
+            let config = app.state::<RwLock<Config>>();
+            let config = config.read();
+            let proxy_host = &config.proxy_host;
+            let proxy_port = &config.proxy_port;
+            let proxy_url = format!("http://{proxy_host}:{proxy_port}");
+
+            match reqwest::Proxy::all(&proxy_url).map_err(anyhow::Error::from) {
+                Ok(proxy) => builder.proxy(proxy),
+                Err(err) => {
+                    let err = err.context(format!("BiliClient设置代理 {proxy_url} 失败"));
+                    emit_set_proxy_error_event(app, err.to_string_chain());
+                    builder
+                }
+            }
+        }
+    };
+
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
 
     reqwest_middleware::ClientBuilder::new(builder.build().unwrap())
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build()
+}
+
+fn emit_set_proxy_error_event(app: &AppHandle, err_msg: String) {
+    let payload = SetProxyErrorEventPayload { err_msg };
+    let event = SetProxyErrorEvent(payload);
+    let _ = event.emit(app);
 }
