@@ -4,8 +4,7 @@ import {onMounted, ref} from "vue";
 import {commands, Config, events} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 import {open} from "@tauri-apps/plugin-dialog";
-import {path} from "@tauri-apps/api";
-import {appDataDir} from "@tauri-apps/api/path";
+import SettingsDialog from "./SettingsDialog.vue";
 
 type ProgressData = {
   comicTitle: string;
@@ -20,6 +19,7 @@ const notification = useNotification();
 
 const config = defineModel<Config>("config", {required: true});
 
+const settingsDialogShowing = ref<boolean>(false);
 const progresses = ref<Map<number, ProgressData>>(new Map());
 const downloadSpeed = ref<string>("");
 
@@ -84,6 +84,10 @@ onMounted(async () => {
   await events.downloadSpeedEvent.listen(({payload}) => {
     downloadSpeed.value = payload.speed;
   });
+
+  await events.setProxyErrorEvent.listen(({payload}) => {
+    notification.error({title: "设置代理失败", description: payload.errMsg});
+  });
 });
 
 async function showDownloadDirInFileManager() {
@@ -93,15 +97,6 @@ async function showDownloadDirInFileManager() {
   const result = await commands.showPathInFileManager(config.value.downloadDir);
   if (result.status === "error") {
     notification.error({title: "打开下载目录失败", description: result.error});
-  }
-}
-
-async function showConfigInFileManager() {
-  const configName = "config.json";
-  const configPath = await path.join(await appDataDir(), configName);
-  const result = await commands.showPathInFileManager(configPath);
-  if (result.status === "error") {
-    notification.error({title: "打开配置文件失败", description: result.error});
   }
 }
 
@@ -126,7 +121,7 @@ async function selectDownloadDir() {
         <template #prefix>下载目录：</template>
       </n-input>
       <n-button size="tiny" @click="showDownloadDirInFileManager">下载目录</n-button>
-      <n-button size="tiny" @click="showConfigInFileManager">配置目录</n-button>
+      <n-button type="primary" secondary size="tiny" @click="settingsDialogShowing=true">更多设置</n-button>
     </div>
     <n-radio-group v-model:value="config.archiveFormat">
       下载格式：
@@ -134,7 +129,7 @@ async function selectDownloadDir() {
       <n-radio value="Zip">zip</n-radio>
       <n-radio value="Cbz">cbz</n-radio>
     </n-radio-group>
-<!--    <span>下载速度：{{ downloadSpeed }}</span>-->
+    <!--    <span>下载速度：{{ downloadSpeed }}</span>-->
     <div class="overflow-auto">
       <div class="grid grid-cols-[1fr_1fr_2fr]"
            v-for="[epId, { comicTitle, episodeTitle, percentage, total, current}] in progresses"
@@ -147,5 +142,8 @@ async function selectDownloadDir() {
         </n-progress>
       </div>
     </div>
+    <n-modal v-model:show="settingsDialogShowing">
+      <settings-dialog v-model:showing="settingsDialogShowing" v-model:config="config"/>
+    </n-modal>
   </div>
 </template>

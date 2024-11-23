@@ -138,7 +138,8 @@ downloadStartEvent: DownloadStartEvent,
 removeWatermarkEndEvent: RemoveWatermarkEndEvent,
 removeWatermarkErrorEvent: RemoveWatermarkErrorEvent,
 removeWatermarkStartEvent: RemoveWatermarkStartEvent,
-removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent
+removeWatermarkSuccessEvent: RemoveWatermarkSuccessEvent,
+setProxyErrorEvent: SetProxyErrorEvent
 }>({
 downloadEndEvent: "download-end-event",
 downloadImageErrorEvent: "download-image-error-event",
@@ -149,7 +150,8 @@ downloadStartEvent: "download-start-event",
 removeWatermarkEndEvent: "remove-watermark-end-event",
 removeWatermarkErrorEvent: "remove-watermark-error-event",
 removeWatermarkStartEvent: "remove-watermark-start-event",
-removeWatermarkSuccessEvent: "remove-watermark-success-event"
+removeWatermarkSuccessEvent: "remove-watermark-success-event",
+setProxyErrorEvent: "set-proxy-error-event"
 })
 
 /** user-defined constants **/
@@ -173,7 +175,7 @@ export type Comic = { id: number; title: string; comic_type: number; page_defaul
 export type ComicInSearchRespData = { id: number; title: string; square_cover: string; vertical_cover: string; author_name: string[]; styles: string[]; is_finish: number; allow_wait_free: boolean; discount_type: number; type: number; wiki: WikiRespData }
 export type ComicInfo = { manga: string; series: string; publisher: string; writer: string; genre: string; summary: string; count: number; title: string; number: string; pageCount: number; year: number; month: number; day: number }
 export type CommandError = string
-export type Config = { uid: number; accessToken: string; downloadDir: string; archiveFormat: ArchiveFormat; lastUpdateCheckTs: number }
+export type Config = { uid: number; accessToken: string; downloadDir: string; archiveFormat: ArchiveFormat; lastUpdateCheckTs: number; proxyMode: ProxyMode; proxyHost: string; proxyPort: number }
 export type ConfirmAppQrcodeRespData = { code: number; msg?: string }
 export type CookieInfoRespData = { cookies: CookieRespData[]; domains: string[] }
 export type CookieRespData = { name: string; value: string; http_only: number; expires: number; secure: number }
@@ -195,6 +197,7 @@ export type FavComicInfo = { has_fav_activity: boolean; fav_free_amount: number;
 export type Increase = { days: number; increase_percent: number }
 export type InteractiveValue = { interact_value: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type NovelInSearchRespData = { novel_id: number; title: string; v_cover: string; finish_status: number; status: number; discount_type: number; numbers: number; style: StyleRespData; evaluate: string; author: string; tag: TagRespData }
+export type ProxyMode = "NoProxy" | "System" | "Custom"
 export type ReadScore = { read_score: string; is_jump: boolean; increase: Increase; percentile: number; description: string }
 export type RemoveWatermarkEndEvent = RemoveWatermarkEndEventPayload
 export type RemoveWatermarkEndEventPayload = { dirPath: string }
@@ -208,6 +211,8 @@ export type RookieFavTip = { is_show: boolean; used: number; total: number }
 export type SearchComicRespData = { list: ComicInSearchRespData[]; total_page: number; total_num: number; similar: string; se_id: string; banner: BannerRespData }
 export type SearchNovelRespData = { total: number; list: NovelInSearchRespData[] }
 export type SearchRespData = { comic_data: SearchComicRespData; novel_data: SearchNovelRespData }
+export type SetProxyErrorEvent = SetProxyErrorEventPayload
+export type SetProxyErrorEventPayload = { errMsg: string }
 export type StoryElem = { id: number; name: string }
 export type StyleRespData = { id: number; name: string }
 export type Styles2 = { id: number; name: string }
