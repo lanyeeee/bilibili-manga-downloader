@@ -100,9 +100,8 @@ impl DownloadManager {
         }
     }
 
-    // TODO: 这里不应该返回错误，否则会被忽略
     #[allow(clippy::cast_possible_truncation)]
-    async fn process_episode(self, ep_info: EpisodeInfo) -> anyhow::Result<()> {
+    async fn process_episode(self, ep_info: EpisodeInfo) {
         emit_pending_event(
             &self.app,
             ep_info.episode_id,
@@ -110,10 +109,31 @@ impl DownloadManager {
             ep_info.episode_title.clone(),
         );
         // 限制同时下载的章节数量
-        let permit = self.ep_sem.acquire().await?;
+        let permit = match self.ep_sem.acquire().await.map_err(anyhow::Error::from) {
+            Ok(permit) => permit,
+            Err(err) => {
+                let err = err.context("获取下载章节的semaphore失败");
+                let err_msg = err.to_string_chain();
+                emit_end_event(&self.app, ep_info.episode_id, Some(err_msg));
+                return;
+            }
+        };
         // 获取path_urls
         let bili_client = self.bili_client();
-        let image_index_resp_data = bili_client.get_image_index(ep_info.episode_id).await?;
+        let image_index_resp_data = match bili_client.get_image_index(ep_info.episode_id).await {
+            Ok(data) => data,
+            Err(err) => {
+                let comic_title = ep_info.comic_title.clone();
+                let chapter_title = ep_info.episode_title.clone();
+                let err = err.context(format!(
+                    "获取 {comic_title} - {chapter_title} 的ImageIndex失败"
+                ));
+                let id = ep_info.episode_id;
+                let err_msg = err.to_string_chain();
+                emit_end_event(&self.app, id, Some(err_msg));
+                return;
+            }
+        };
         let path_urls: Vec<String> = image_index_resp_data
             .images
             .iter()
@@ -126,8 +146,13 @@ impl DownloadManager {
         let mut current = 0;
         // 下载前先创建临时下载目录
         let temp_download_dir = get_ep_temp_download_dir(&self.app, &ep_info);
-        std::fs::create_dir_all(&temp_download_dir)
-            .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
+        if let Err(err) = std::fs::create_dir_all(&temp_download_dir).map_err(anyhow::Error::from) {
+            let id = ep_info.episode_id;
+            let err = err.context(format!("创建目录 {temp_download_dir:?} 失败"));
+            let err_msg = err.to_string_chain();
+            emit_end_event(&self.app, id, Some(err_msg));
+            return;
+        }
         // 逐一下载图片
         for (i, path_url) in path_urls.into_iter().enumerate() {
             let urls = vec![path_url.clone()];
@@ -171,7 +196,7 @@ impl DownloadManager {
         if current != total {
             let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
             emit_end_event(&self.app, ep_info.episode_id, err_msg);
-            return Ok(());
+            return;
         }
         // 此章节的图片全部下载成功，保存图片
         let err_msg = match self.save_archive(&ep_info, &temp_download_dir) {
@@ -179,7 +204,6 @@ impl DownloadManager {
             Err(err) => Some(err.to_string_chain()),
         };
         emit_end_event(&self.app, ep_info.episode_id, err_msg);
-        Ok(())
     }
 
     fn save_archive(
@@ -259,8 +283,7 @@ impl DownloadManager {
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    // TODO: 这里不应该返回错误，否则会被忽略
-    async fn process_album_plus(self, album_plus_item: AlbumPlusItem) -> anyhow::Result<()> {
+    async fn process_album_plus(self, album_plus_item: AlbumPlusItem) {
         // 进来就发送排队事件
         emit_pending_event(
             &self.app,
@@ -269,7 +292,15 @@ impl DownloadManager {
             album_plus_item.title.clone(),
         );
         // 限制同时下载的章节数量
-        let permit = self.ep_sem.acquire().await?;
+        let permit = match self.ep_sem.acquire().await.map_err(anyhow::Error::from) {
+            Ok(permit) => permit,
+            Err(err) => {
+                let err = err.context("获取下载章节的semaphore失败");
+                let err_msg = err.to_string_chain();
+                emit_end_event(&self.app, album_plus_item.id, Some(err_msg));
+                return;
+            }
+        };
         // 拿到permit后，发送下载开始事件
         let total = album_plus_item.pic.len() as u32;
         emit_start_event(&self.app, album_plus_item.id, total);
@@ -278,8 +309,13 @@ impl DownloadManager {
         let bili_client = self.bili_client();
         // 下载前先创建临时下载目录
         let temp_download_dir = get_album_plus_temp_download_dir(&self.app, &album_plus_item);
-        std::fs::create_dir_all(&temp_download_dir)
-            .context(format!("创建目录 {temp_download_dir:?} 失败"))?;
+        if let Err(err) = std::fs::create_dir_all(&temp_download_dir).map_err(anyhow::Error::from) {
+            let id = album_plus_item.id;
+            let err = err.context(format!("创建目录 {temp_download_dir:?} 失败"));
+            let err_msg = err.to_string_chain();
+            emit_end_event(&self.app, id, Some(err_msg));
+            return;
+        }
         // 逐一下载图片
         for (i, path_url) in album_plus_item.pic.into_iter().enumerate() {
             let urls = vec![path_url.clone()];
@@ -323,16 +359,24 @@ impl DownloadManager {
             // 下载成功，则把临时目录重命名为正式目录
             if let Some(parent) = temp_download_dir.parent() {
                 let download_dir = parent.join(&album_plus_item.title);
-                std::fs::rename(&temp_download_dir, &download_dir).context(format!(
-                    "将 {temp_download_dir:?} 重命名为 {download_dir:?} 失败"
-                ))?;
+
+                if let Err(err) =
+                    std::fs::rename(&temp_download_dir, &download_dir).map_err(anyhow::Error::from)
+                {
+                    let id = album_plus_item.id;
+                    let err = err.context(format!(
+                        "将 {temp_download_dir:?} 重命名为 {download_dir:?} 失败"
+                    ));
+                    let err_msg = err.to_string_chain();
+                    emit_end_event(&self.app, id, Some(err_msg));
+                    return;
+                }
             }
             emit_end_event(&self.app, album_plus_item.id, None);
         } else {
             let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
             emit_end_event(&self.app, album_plus_item.id, err_msg);
         };
-        Ok(())
     }
 
     async fn download_image(&self, url: &str, save_path: &Path) -> anyhow::Result<()> {
