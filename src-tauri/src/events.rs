@@ -8,7 +8,7 @@ pub mod prelude {
     pub use crate::events::{
         DownloadEndEvent, DownloadImageErrorEvent, DownloadImageSuccessEvent, DownloadPendingEvent,
         DownloadSpeedEvent, DownloadStartEvent, RemoveWatermarkEndEvent, RemoveWatermarkErrorEvent,
-        RemoveWatermarkStartEvent, RemoveWatermarkSuccessEvent,
+        RemoveWatermarkStartEvent, RemoveWatermarkSuccessEvent, SetProxyErrorEvent,
     };
 }
 
@@ -104,3 +104,11 @@ pub struct DownloadSpeedEventPayload {
 }
 #[derive(Serialize, Deserialize, Clone, Type, Event)]
 pub struct DownloadSpeedEvent(pub DownloadSpeedEventPayload);
+
+#[derive(Serialize, Deserialize, Clone, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SetProxyErrorEventPayload {
+    pub err_msg: String,
+}
+#[derive(Serialize, Deserialize, Clone, Type, Event)]
+pub struct SetProxyErrorEvent(pub SetProxyErrorEventPayload);

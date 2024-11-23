@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::types::ArchiveFormat;
+use crate::types::{ArchiveFormat, ProxyMode};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -14,6 +14,9 @@ pub struct Config {
     pub download_dir: PathBuf,
     pub archive_format: ArchiveFormat,
     pub last_update_check_ts: i64,
+    pub proxy_mode: ProxyMode,
+    pub proxy_host: String,
+    pub proxy_port: u16,
 }
 
 impl Config {
@@ -27,6 +30,9 @@ impl Config {
             download_dir: app_data_dir.join("漫画下载"),
             archive_format: ArchiveFormat::default(),
             last_update_check_ts: 0,
+            proxy_mode: ProxyMode::default(),
+            proxy_host: String::new(),
+            proxy_port: 7890,
         };
         // 如果配置文件存在且能够解析，则使用配置文件中的配置，否则使用默认配置
         let config = if config_path.exists() {

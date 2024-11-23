@@ -53,6 +53,7 @@ pub fn run() {
             DownloadImageErrorEvent,
             DownloadEndEvent,
             DownloadSpeedEvent,
+            SetProxyErrorEvent,
         ]);
 
     #[cfg(debug_assertions)]
