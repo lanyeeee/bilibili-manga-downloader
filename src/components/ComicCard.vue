@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ComicInfo} from "../types.ts";
-import {commands, Comic} from "../bindings.ts";
+import {Comic, commands} from "../bindings.ts";
 import {useNotification} from "naive-ui";
 
 const notification = useNotification();
