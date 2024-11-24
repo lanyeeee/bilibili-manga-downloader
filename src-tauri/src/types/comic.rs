@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::config::Config;
 use crate::responses::{ComicRespData, EpisodeRespData};
-use crate::types::AlbumPlus;
 use crate::utils::filename_filter;
 
 use chrono::{Datelike, NaiveDateTime};
@@ -152,12 +151,11 @@ pub struct Comic {
     pub data_info: DataInfo,
     #[serde(rename = "last_short_title_msg")]
     pub last_short_title_msg: String,
-    pub album_plus: AlbumPlus,
 }
 impl Comic {
     #[allow(clippy::too_many_lines)]
     // TODO: 统一用from实现，以减少代码行数
-    pub fn from(app: &AppHandle, comic: ComicRespData, album_plus: AlbumPlus) -> Self {
+    pub fn from(app: &AppHandle, comic: ComicRespData) -> Self {
         let comic_title = filename_filter(&comic.title);
         let mut episode_infos: Vec<EpisodeInfo> = comic
             .ep_list
@@ -386,7 +384,6 @@ impl Comic {
             horizontal_covers: comic.horizontal_covers,
             data_info,
             last_short_title_msg: comic.last_short_title_msg,
-            album_plus,
         }
     }
     fn get_episode_title(ep: &EpisodeRespData) -> String {
