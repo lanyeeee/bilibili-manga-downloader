@@ -36,12 +36,6 @@ function extractIds(elements: Element[]): number[] {
         if (episodeInfo !== undefined) {
           return !episodeInfo.isLocked && !episodeInfo.isDownloaded;
         }
-
-        const albumPlusDetail = selectedComic.value?.albumPlus.list.find(detail => detail.item.id === id);
-        if (albumPlusDetail !== undefined) {
-          return !albumPlusDetail.isLock && !albumPlusDetail.isDownloaded;
-        }
-
         return false;
       });
 }
@@ -72,10 +66,6 @@ function onDropdownSelect(key: "check" | "uncheck" | "check all" | "uncheck all"
     selectedComic.value?.episodeInfos
         .filter(ep => !ep.isLocked && !ep.isDownloaded && !checkedIds.value.includes(ep.episodeId))
         .forEach(ep => checkedIds.value.push(ep.episodeId));
-
-    selectedComic.value?.albumPlus.list
-        .filter(detail => !detail.isLock && !detail.isDownloaded && !checkedIds.value.includes(detail.item.id))
-        .forEach(detail => checkedIds.value.push(detail.item.id));
   } else if (key === "uncheck all") {
     checkedIds.value.length = 0;
   }
@@ -103,24 +93,6 @@ async function downloadChecked() {
       if (episode !== undefined) {
         episode.isDownloaded = true;
         checkedIds.value = checkedIds.value.filter(id => id !== downloadedEp.episodeId);
-      }
-    }
-  }
-
-  const albumPlusItemToDownload = selectedComic.value?.albumPlus.list
-      .filter(detail => !detail.isDownloaded && checkedIds.value.includes(detail.item.id))
-      .map(detail => detail.item);
-  if (albumPlusItemToDownload !== undefined) {
-    const result = await commands.downloadAlbumPlusItems(albumPlusItemToDownload);
-    if (result.status === "error") {
-      notification.error({title: "下载特典失败", description: result.error});
-    }
-
-    for (const downloadedItem of albumPlusItemToDownload) {
-      const detail = selectedComic.value?.albumPlus.list.find(detail => detail.item.id === downloadedItem.id);
-      if (detail !== undefined) {
-        detail.isDownloaded = true;
-        checkedIds.value = checkedIds.value.filter(id => id !== downloadedItem.id);
       }
     }
   }
@@ -183,28 +155,6 @@ async function refreshEpisodes() {
                         :label="episodeTitle"
                         :disabled="isLocked || isDownloaded"
                         :class="{ selected: selectedIds.has(episodeId), downloaded: isDownloaded }"/>
-          </div>
-        </n-checkbox-group>
-      </SelectionArea>
-      <n-divider class="my-0!" title-placement="left">
-        特典
-      </n-divider>
-      <SelectionArea ref="selectionAreaRef"
-                     class="selection-container flex-shrink-0 mb-3 max-h-[30%]"
-                     :options="{selectables: '.selectable', features: {deselectOnBlur: true}} as SelectionOptions"
-                     @contextmenu="onContextMenu"
-                     @move="onDragMove"
-                     @start="onDragStart">
-        <n-checkbox-group v-model:value="checkedIds" class="flex flex-col">
-          <div class="grid grid-cols-3 gap-1.5 w-full">
-            <n-checkbox v-for="{isLock, isDownloaded, item} in selectedComic.albumPlus.list"
-                        :key="item.id"
-                        :data-key="item.id"
-                        class="selectable hover:bg-gray-200!"
-                        :value="item.id"
-                        :label="item.title"
-                        :disabled="isLock || isDownloaded"
-                        :class="{ selected: selectedIds.has(item.id), downloaded: isDownloaded }"/>
           </div>
         </n-checkbox-group>
       </SelectionArea>

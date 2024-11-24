@@ -1,29 +1,38 @@
+use crate::bili_client::BiliClient;
+use crate::config::Config;
+use crate::events;
+use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
+use crate::extensions::AnyhowErrorToStringChain;
+use crate::types::{ArchiveFormat, EpisodeInfo};
+use aes::cipher::consts::U16;
+use aes::cipher::generic_array::GenericArray;
+use aes::cipher::{BlockDecrypt, KeyInit};
+use aes::Aes256;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::bili_client::BiliClient;
-use crate::config::Config;
-use crate::events;
-use crate::events::{DownloadSpeedEvent, DownloadSpeedEventPayload};
-use crate::extensions::AnyhowErrorToStringChain;
-use crate::types::{AlbumPlusItem, ArchiveFormat, EpisodeInfo};
-
 use anyhow::{anyhow, Context};
+use base64::engine::general_purpose;
+use base64::Engine;
+use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
 use parking_lot::RwLock;
+use percent_encoding::percent_decode_str;
+use rand::Rng;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, Semaphore};
+use url::Url;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
 // TODO: EpisodeInfo与AlbumPlusItem的内存差距过大，应该用Box包裹EpisodeInfo
 enum DownloadPayload {
     Episode(EpisodeInfo),
-    AlbumPlus(AlbumPlusItem),
 }
 
 /// 用于管理下载任务
@@ -65,12 +74,6 @@ impl DownloadManager {
         Ok(())
     }
 
-    pub async fn submit_album_plus(&self, item: AlbumPlusItem) -> anyhow::Result<()> {
-        let value = DownloadPayload::AlbumPlus(item);
-        self.sender.send(value).await?;
-        Ok(())
-    }
-
     #[allow(clippy::cast_precision_loss)]
     // TODO: 换个函数名，如emit_download_speed_loop
     async fn log_download_speed(app: AppHandle) {
@@ -92,9 +95,6 @@ impl DownloadManager {
             match payload {
                 DownloadPayload::Episode(ep_info) => {
                     tauri::async_runtime::spawn(manager.process_episode(ep_info));
-                }
-                DownloadPayload::AlbumPlus(item) => {
-                    tauri::async_runtime::spawn(manager.process_album_plus(item));
                 }
             }
         }
@@ -120,7 +120,10 @@ impl DownloadManager {
         };
         // 获取path_urls
         let bili_client = self.bili_client();
-        let image_index_resp_data = match bili_client.get_image_index(ep_info.episode_id).await {
+        let image_index_resp_data = match bili_client
+            .get_image_index(ep_info.comic_id, ep_info.episode_id)
+            .await
+        {
             Ok(data) => data,
             Err(err) => {
                 let comic_title = ep_info.comic_title.clone();
@@ -156,7 +159,10 @@ impl DownloadManager {
         // 逐一下载图片
         for (i, path_url) in path_urls.into_iter().enumerate() {
             let urls = vec![path_url.clone()];
-            let image_token_resp_data = match bili_client.get_image_token(&urls).await {
+            let image_token_resp_data = match bili_client
+                .get_image_token(ep_info.comic_id, ep_info.episode_id, &urls)
+                .await
+            {
                 Ok(data) => data,
                 Err(err) => {
                     let id = ep_info.episode_id;
@@ -185,8 +191,8 @@ impl DownloadManager {
                 save_path.to_string_lossy().to_string(), // TODO: 把save_path.to_string_lossy().to_string()保存到一个变量里，像current一样
                 current,
             );
-            // 每下载完一张图片，都休息800-1300毫秒，避免风控
-            let sleep_time = 800 + rand::random::<u64>() % 500;
+            // 每下载完一张图片，都休息100-500ms
+            let sleep_time = rand::thread_rng().gen_range(100..=500);
             tokio::time::sleep(Duration::from_millis(sleep_time)).await;
         }
         // 该章节的图片下载完成，释放permit，允许其他章节下载
@@ -282,109 +288,20 @@ impl DownloadManager {
         Ok(())
     }
 
-    #[allow(clippy::cast_possible_truncation)]
-    async fn process_album_plus(self, album_plus_item: AlbumPlusItem) {
-        // 进来就发送排队事件
-        emit_pending_event(
-            &self.app,
-            album_plus_item.id,
-            album_plus_item.comic_title.clone(),
-            album_plus_item.title.clone(),
-        );
-        // 限制同时下载的章节数量
-        let permit = match self.ep_sem.acquire().await.map_err(anyhow::Error::from) {
-            Ok(permit) => permit,
-            Err(err) => {
-                let err = err.context("获取下载章节的semaphore失败");
-                let err_msg = err.to_string_chain();
-                emit_end_event(&self.app, album_plus_item.id, Some(err_msg));
-                return;
-            }
-        };
-        // 拿到permit后，发送下载开始事件
-        let total = album_plus_item.pic.len() as u32;
-        emit_start_event(&self.app, album_plus_item.id, total);
-        // 准备下载需要的变量
-        let mut current = 0;
-        let bili_client = self.bili_client();
-        // 下载前先创建临时下载目录
-        let temp_download_dir = get_album_plus_temp_download_dir(&self.app, &album_plus_item);
-        if let Err(err) = std::fs::create_dir_all(&temp_download_dir).map_err(anyhow::Error::from) {
-            let id = album_plus_item.id;
-            let err = err.context(format!("创建目录 {temp_download_dir:?} 失败"));
-            let err_msg = err.to_string_chain();
-            emit_end_event(&self.app, id, Some(err_msg));
-            return;
-        }
-        // 逐一下载图片
-        for (i, path_url) in album_plus_item.pic.into_iter().enumerate() {
-            let urls = vec![path_url.clone()];
-            let image_token_resp_data = match bili_client.get_image_token(&urls).await {
-                Ok(data) => data,
-                Err(err) => {
-                    let id = album_plus_item.id;
-                    let err_msg = err.to_string_chain();
-                    emit_error_event(&self.app, id, path_url, err_msg);
-                    // 如果获取图片下载链接失败，则不再下载剩余的图片，直接跳出循环
-                    break;
-                }
-            };
-            let url = &image_token_resp_data[0].complete_url;
-            let save_path = temp_download_dir.join(format!("{:03}.jpg", i + 1));
-            // 下载图片
-            if let Err(err) = self.download_image(url, &save_path).await {
-                let id = album_plus_item.id;
-                let err_msg = err.to_string_chain();
-                emit_error_event(&self.app, id, url.clone(), err_msg);
-                // 如果下载失败，则不再下载剩余的图片，直接跳出循环
-                break;
-            }
-            // 下载完成后，更新章节下载进度
-            current += 1;
-            emit_success_event(
-                &self.app,
-                album_plus_item.id,
-                save_path.to_string_lossy().to_string(),
-                current,
-            );
-            // 每下载完一张图片，都休息800-1300毫秒，避免风控
-            let sleep_time = 800 + rand::random::<u64>() % 500;
-            tokio::time::sleep(Duration::from_millis(sleep_time)).await;
-        }
-        // 该章节的图片下载完成，释放permit，允许其他章节下载
-        drop(permit);
-        // 检查此章节的图片是否全部下载成功
-        // TODO: 重构下面的代码
-        if current == total {
-            // 下载成功，则把临时目录重命名为正式目录
-            if let Some(parent) = temp_download_dir.parent() {
-                let download_dir = parent.join(&album_plus_item.title);
-
-                if let Err(err) =
-                    std::fs::rename(&temp_download_dir, &download_dir).map_err(anyhow::Error::from)
-                {
-                    let id = album_plus_item.id;
-                    let err = err.context(format!(
-                        "将 {temp_download_dir:?} 重命名为 {download_dir:?} 失败"
-                    ));
-                    let err_msg = err.to_string_chain();
-                    emit_end_event(&self.app, id, Some(err_msg));
-                    return;
-                }
-            }
-            emit_end_event(&self.app, album_plus_item.id, None);
-        } else {
-            let err_msg = Some(format!("总共有 {total} 张图片，但只下载了 {current} 张"));
-            emit_end_event(&self.app, album_plus_item.id, err_msg);
-        };
-    }
-
     async fn download_image(&self, url: &str, save_path: &Path) -> anyhow::Result<()> {
         let image_data = self
             .bili_client()
             .get_image_bytes(url)
             .await
             .context(format!("下载图片 {url} 失败"))?;
+        // 如果图片链接中包含cpx参数，则需要解密图片数据
+        let parsed_url = Url::parse(url).context(format!("解析图片链接 {url} 失败"))?;
+        let cpx_query = parsed_url.query_pairs().find(|(key, _)| key == "cpx");
+        let image_data = if let Some((_, cpx)) = cpx_query {
+            decrypt_img_data(image_data, &cpx).context(format!("解密图片 {url} 失败"))?
+        } else {
+            image_data
+        };
         // 保存图片
         std::fs::write(save_path, &image_data).context(format!("保存图片 {save_path:?} 失败"))?;
         // 记录下载字节数
@@ -404,15 +321,6 @@ fn get_ep_temp_download_dir(app: &AppHandle, ep_info: &EpisodeInfo) -> PathBuf {
         .download_dir
         .join(&ep_info.comic_title)
         .join(format!(".下载中-{}", ep_info.episode_title)) // 以 `.下载中-` 开头，表示是临时目录
-}
-
-fn get_album_plus_temp_download_dir(app: &AppHandle, album_plus_item: &AlbumPlusItem) -> PathBuf {
-    app.state::<RwLock<Config>>()
-        .read()
-        .download_dir
-        .join(&album_plus_item.comic_title)
-        .join("特典")
-        .join(format!(".下载中-{}", album_plus_item.title)) // 以 `.下载中-` 开头，表示是临时目录
 }
 
 fn emit_start_event(app: &AppHandle, id: i64, total: u32) {
@@ -453,4 +361,65 @@ fn emit_download_speed_event(app: &AppHandle, speed: String) {
     let payload = DownloadSpeedEventPayload { speed };
     let event = DownloadSpeedEvent(payload);
     let _ = event.emit(app);
+}
+
+fn aes_cbc_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Vec<u8> {
+    const BLOCK_SIZE: usize = 16;
+    let cipher = Aes256::new(GenericArray::from_slice(key));
+    // 存储解密后的数据
+    let mut decrypted_data_with_padding = Vec::with_capacity(encrypted_data.len());
+    // 将IV作为初始化块处理，解密时与第一个加密块进行异或
+    let mut previous_block: GenericArray<u8, U16> = *GenericArray::from_slice(iv);
+    // 逐块解密
+    for chunk in encrypted_data.chunks(BLOCK_SIZE) {
+        let mut block = GenericArray::clone_from_slice(chunk);
+        cipher.decrypt_block(&mut block);
+        // 与前一个块进行异或操作
+        for i in 0..BLOCK_SIZE {
+            block[i] ^= previous_block[i]; // 与前一个块进行异或
+        }
+        // 将解密后的数据追加到解密结果
+        decrypted_data_with_padding.extend_from_slice(&block);
+        // 将当前块的密文作为下一个块的IV
+        previous_block = GenericArray::clone_from_slice(chunk);
+    }
+
+    // 去除PKCS#7填充，根据最后一个字节的值确定填充长度
+    let padding_len = decrypted_data_with_padding.last().copied().unwrap() as usize;
+    let data_len = decrypted_data_with_padding.len() - padding_len;
+    decrypted_data_with_padding[..data_len].to_vec()
+}
+
+fn decrypt_img_data(img_data: Bytes, cpx: &str) -> anyhow::Result<Bytes> {
+    // 如果数据能够被解析为图片格式，则直接返回
+    if image::guess_format(&img_data).is_ok() {
+        return Ok(img_data);
+    }
+    // 否则，解密图片数据
+    let img_flag = img_data[0];
+    if img_flag != 1 {
+        return Err(anyhow!(
+            "解密图片数据失败，预料之外的图片数据标志位: {img_flag}"
+        ));
+    }
+    let data_length = BigEndian::read_u32(&img_data[1..5]) as usize;
+    if data_length + 5 > img_data.len() {
+        return Ok(img_data);
+    };
+    // 准备解密所需的数据
+    let cpx_text = percent_decode_str(cpx).decode_utf8_lossy().to_string();
+    let cpx_char = general_purpose::STANDARD.decode(cpx_text)?;
+    let iv = &cpx_char[60..76];
+    let key = &img_data[data_length + 5..];
+    let content = &img_data[5..data_length + 5];
+    // 如果数据长度小于20496，则直接解密
+    if content.len() < 20496 {
+        let decrypted_data = aes_cbc_decrypt(content, key, iv);
+        return Ok(decrypted_data.into());
+    }
+    // 否则，先解密前20496字节，再拼接后面的数据
+    let img_head = aes_cbc_decrypt(&content[0..20496], key, iv);
+    let mut decrypted_data = img_head;
+    decrypted_data.extend_from_slice(&content[20496..]);
+    Ok(decrypted_data.into())
 }
