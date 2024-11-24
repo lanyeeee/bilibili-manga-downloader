@@ -12,13 +12,10 @@ use crate::config::Config;
 use crate::download_manager::DownloadManager;
 use crate::errors::CommandResult;
 use crate::responses::{
-    ConfirmAppQrcodeRespData, GithubReleasesResp, SearchRespData, UserProfileRespData,
+    GithubReleasesResp, SearchRespData, UserProfileRespData,
     WebQrcodeStatusRespData,
 };
-use crate::types::{
-    AlbumPlus, AlbumPlusItem, AppQrcodeData, AppQrcodeStatus, CheckUpdateResult, Comic,
-    EpisodeInfo, WebQrcodeData,
-};
+use crate::types::{CheckUpdateResult, Comic, EpisodeInfo, WebQrcodeData};
 
 #[tauri::command]
 #[specta::specta]
@@ -61,25 +58,6 @@ pub async fn save_config(
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn generate_app_qrcode(
-    bili_client: State<'_, BiliClient>,
-) -> CommandResult<AppQrcodeData> {
-    let app_qrcode_data = bili_client.generate_app_qrcode().await?;
-    Ok(app_qrcode_data)
-}
-
-#[tauri::command(async)]
-#[specta::specta]
-pub async fn get_app_qrcode_status(
-    bili_client: State<'_, BiliClient>,
-    auth_code: String,
-) -> CommandResult<AppQrcodeStatus> {
-    let app_qrcode_status = bili_client.get_app_qrcode_status(auth_code).await?;
-    Ok(app_qrcode_status)
-}
-
-#[tauri::command(async)]
-#[specta::specta]
 pub async fn generate_web_qrcode(
     bili_client: State<'_, BiliClient>,
 ) -> CommandResult<WebQrcodeData> {
@@ -95,20 +73,6 @@ pub async fn get_web_qrcode_status(
 ) -> CommandResult<WebQrcodeStatusRespData> {
     let web_qrcode_status = bili_client.get_web_qrcode_status(&qrcode_key).await?;
     Ok(web_qrcode_status)
-}
-
-#[tauri::command(async)]
-#[specta::specta]
-pub async fn confirm_app_qrcode(
-    bili_client: State<'_, BiliClient>,
-    auth_code: String,
-    sessdata: String,
-    csrf: String,
-) -> CommandResult<ConfirmAppQrcodeRespData> {
-    let confirm_app_qrcode_resp_data = bili_client
-        .confirm_app_qrcode(&auth_code, &sessdata, &csrf)
-        .await?;
-    Ok(confirm_app_qrcode_resp_data)
 }
 
 #[tauri::command(async)]
@@ -140,34 +104,12 @@ pub async fn get_comic(bili_client: State<'_, BiliClient>, comic_id: i64) -> Com
 
 #[tauri::command(async)]
 #[specta::specta]
-pub async fn get_album_plus(
-    bili_client: State<'_, BiliClient>,
-    comic_id: i64,
-) -> CommandResult<AlbumPlus> {
-    let album_plus = bili_client.get_album_plus(comic_id).await?;
-    Ok(album_plus)
-}
-
-#[tauri::command(async)]
-#[specta::specta]
 pub async fn download_episodes(
     download_manager: State<'_, DownloadManager>,
     episodes: Vec<EpisodeInfo>,
 ) -> CommandResult<()> {
     for ep in episodes {
         download_manager.submit_episode(ep).await?;
-    }
-    Ok(())
-}
-
-#[tauri::command(async)]
-#[specta::specta]
-pub async fn download_album_plus_items(
-    download_manager: State<'_, DownloadManager>,
-    items: Vec<AlbumPlusItem>,
-) -> CommandResult<()> {
-    for item in items {
-        download_manager.submit_album_plus(item).await?;
     }
     Ok(())
 }

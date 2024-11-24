@@ -2,7 +2,6 @@
 import {Comic, commands, Config, UserProfileRespData} from "./bindings.ts";
 import {onMounted, ref, watch} from "vue";
 import {useMessage, useNotification} from "naive-ui";
-import QrcodeViewer from "./components/QrcodeViewer.vue";
 import DownloadingList from "./components/DownloadingList.vue";
 import SearchPane from "./components/SearchPane.vue";
 import EpisodePane from "./components/EpisodePane.vue";
@@ -12,7 +11,6 @@ const notification = useNotification();
 const message = useMessage();
 
 const config = ref<Config>();
-const qrcodeViewerShowing = ref<boolean>(false);
 const cookieLoginDialogShowing = ref<boolean>(false);
 const currentTabName = ref<"search" | "episode">("search");
 const selectedComic = ref<Comic>();
@@ -31,8 +29,8 @@ watch(config, async () => {
   message.success("保存配置成功");
 }, {deep: true});
 
-watch(() => config.value?.accessToken, async () => {
-  if (config.value === undefined || config.value.accessToken === "") {
+watch(() => config.value?.cookie, async () => {
+  if (config.value === undefined || config.value.cookie === "") {
     return;
   }
   const result = await commands.getUserProfile();
@@ -41,11 +39,9 @@ watch(() => config.value?.accessToken, async () => {
     userProfile.value = undefined;
     return;
   }
-  if (result.data.mid !== config.value.uid) {
-    config.value.uid = result.data.mid;
-  }
   userProfile.value = result.data;
   message.success("获取用户信息成功");
+  cookieLoginDialogShowing.value = false;
 });
 
 onMounted(async () => {
@@ -124,8 +120,7 @@ async function test() {
       </div>
       <div class="basis-1/2 flex flex-col overflow-hidden h-full">
         <div class="flex">
-          <n-button @click="qrcodeViewerShowing=true" type="primary">二维码登录</n-button>
-          <n-button @click="cookieLoginDialogShowing=true" type="primary" secondary>Cookie登录</n-button>
+          <n-button @click="cookieLoginDialogShowing=true" type="primary">Cookie登录</n-button>
           <n-button @click="test">测试用</n-button>
           <div v-if="userProfile!==undefined" class="flex flex-justify-end">
             <n-avatar round
@@ -138,11 +133,8 @@ async function test() {
         <downloading-list class="overflow-auto" v-model:config="config"></downloading-list>
       </div>
     </div>
+    <n-modal v-model:show="cookieLoginDialogShowing">
+      <cookie-login-dialog v-model:showing="cookieLoginDialogShowing" v-model:config="config"/>
+    </n-modal>
   </div>
-  <n-modal preset="dialog" title="请使用BiliBili手机客户端扫描二维码登录" v-model:show="qrcodeViewerShowing">
-    <qrcode-viewer v-if="config!==undefined" v-model:showing="qrcodeViewerShowing" v-model:config="config"/>
-  </n-modal>
-  <n-modal v-model:show="cookieLoginDialogShowing">
-    <cookie-login-dialog v-if="config!==undefined" v-model:showing="cookieLoginDialogShowing" v-model:config="config"/>
-  </n-modal>
 </template>

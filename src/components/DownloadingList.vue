@@ -123,7 +123,7 @@ async function selectDownloadDir() {
       <n-button size="tiny" @click="showDownloadDirInFileManager">下载目录</n-button>
       <n-button type="primary" secondary size="tiny" @click="settingsDialogShowing=true">更多设置</n-button>
     </div>
-    <!--    <span>下载速度：{{ downloadSpeed }}</span>-->
+        <span>下载速度：{{ downloadSpeed }}</span>
     <div class="overflow-auto">
       <div class="grid grid-cols-[1fr_1fr_2fr]"
            v-for="[epId, { comicTitle, episodeTitle, percentage, total, current}] in progresses"

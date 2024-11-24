@@ -6,5 +6,6 @@ use specta::Type;
 pub struct UserProfileRespData {
     pub mid: u64,
     pub face: String,
+    #[serde(alias = "uname")]
     pub name: String,
 }
