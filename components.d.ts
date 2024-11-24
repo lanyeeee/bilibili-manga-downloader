@@ -32,7 +32,6 @@ declare module 'vue' {
     NRadioGroup: typeof import('naive-ui')['NRadioGroup']
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']
-    QrcodeViewer: typeof import('./src/components/QrcodeViewer.vue')['default']
     SearchPane: typeof import('./src/components/SearchPane.vue')['default']
     SettingsDialog: typeof import('./src/components/SettingsDialog.vue')['default']
   }
