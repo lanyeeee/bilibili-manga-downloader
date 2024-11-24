@@ -21,6 +21,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use parking_lot::RwLock;
 use percent_encoding::percent_decode_str;
+use rand::Rng;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use tokio::sync::mpsc::Receiver;
@@ -190,9 +191,9 @@ impl DownloadManager {
                 save_path.to_string_lossy().to_string(), // TODO: 把save_path.to_string_lossy().to_string()保存到一个变量里，像current一样
                 current,
             );
-            // 每下载完一张图片，都休息800-1300毫秒，避免风控
-            // let sleep_time = 800 + rand::random::<u64>() % 500;
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            // 每下载完一张图片，都休息100-500ms
+            let sleep_time = rand::thread_rng().gen_range(100..=500);
+            tokio::time::sleep(Duration::from_millis(sleep_time)).await;
         }
         // 该章节的图片下载完成，释放permit，允许其他章节下载
         drop(permit);
