@@ -456,9 +456,7 @@ impl BiliClient {
 }
 
 fn create_http_client(app: &AppHandle) -> ClientWithMiddleware {
-    let builder = reqwest::ClientBuilder::new()
-        .use_rustls_tls()
-        .danger_accept_invalid_certs(true);
+    let builder = reqwest::ClientBuilder::new();
 
     let proxy_mode = app.state::<RwLock<Config>>().read().proxy_mode.clone();
     let builder = match proxy_mode {
